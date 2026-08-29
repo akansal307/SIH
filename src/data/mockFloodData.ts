@@ -40,7 +40,10 @@ let bundlePromise: Promise<FloodDataBundle> | null = null;
 let routesPromise: Promise<RouteRecommendation[]> | null = null;
 
 async function loadBundleUncached(): Promise<FloodDataBundle> {
-  const wire = await fetchJson<ScenariosBundleWire>("/data/scenarios.json", { timeoutMs: 15000 });
+const wire = await fetchJson<ScenariosBundleWire>(
+  `${import.meta.env.BASE_URL}data/scenarios.json`,
+  { timeoutMs: 15000 }
+);
   return {
     generatedAt: wire.generated_at,
     modelInfo: adaptModelInfo(wire.model_info),
@@ -62,9 +65,12 @@ export function loadMockBundle(): Promise<FloodDataBundle> {
 
 export function loadMockRoutes(): Promise<RouteRecommendation[]> {
   if (!routesPromise) {
-    routesPromise = fetchJson<RoutesBundleWire>("/data/routes.json", { timeoutMs: 15000 }).then((wire) =>
-      wire.routes.map(adaptRoute)
-    );
+    routesPromise = fetchJson<RoutesBundleWire>(
+  `${import.meta.env.BASE_URL}data/routes.json`,
+  { timeoutMs: 15000 }
+).then((wire) =>
+  wire.routes.map(adaptRoute)
+);
   }
   return routesPromise;
 }
