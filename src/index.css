@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+/*
+  Design language: an operational disaster-management control room, not a SaaS
+  dashboard. Dark, low-glare surfaces (control rooms run dark so screens and
+  wall-maps stay legible under low ambient light); a restrained teal accent for
+  live/interactive state (evokes a radar/rainfall sweep without being literal);
+  and IMD-style severity colours (green/amber/red) for flood risk, since that is
+  the actual colour code India's own weather warnings use — familiar to the
+  target user (a municipal control-room operator), not an invented palette.
+*/
+@theme {
+  --color-void: #0a0f1a;
+  --color-panel: #111927;
+  --color-panel-raised: #182338;
+  --color-panel-raised-2: #1f2c46;
+  --color-hairline: #263349;
+  --color-hairline-soft: #1c2740;
+
+  --color-text-primary: #e8edf5;
+  --color-text-muted: #94a2b8;
+  --color-text-faint: #5b6b84;
+
+  --color-accent: #2fb8c6;
+  --color-accent-dim: #1c6570;
+  --color-accent-soft: #132a2f;
+
+  --color-risk-low: #3fa34d;
+  --color-risk-low-soft: #16281a;
+  --color-risk-moderate: #e0a030;
+  --color-risk-moderate-soft: #2b2113;
+  --color-risk-high: #d6473f;
+  --color-risk-high-soft: #2c1715;
+
+  --color-sim: #8b7fd9;
+  --color-sim-soft: #211c3d;
+
+  --font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-accent-dim);
+  color: var(--color-text-primary);
+}
+
+/* Slim, low-contrast scrollbars that fit the control-room surfaces */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-hairline);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-panel-raised-2);
+}
+
+/* MapLibre control theming — keep native controls but restyle to match the
+   dark control-room surface instead of the default light UI. */
+.maplibregl-ctrl-group {
+  background: var(--color-panel) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+}
+.maplibregl-ctrl-group button:hover {
+  background: var(--color-panel-raised) !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--color-hairline) !important;
+}
+.maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.6) saturate(0);
+}
+.maplibregl-ctrl-attrib {
+  background: rgba(10, 15, 26, 0.72) !important;
+  color: var(--color-text-faint) !important;
+  border-radius: 6px 0 0 0 !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-text-muted) !important;
+}
+.maplibregl-popup-content {
+  background: var(--color-panel-raised) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 10px !important;
+  font-family: var(--font-sans) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: var(--color-panel-raised) !important;
+  border-bottom-color: var(--color-panel-raised) !important;
+}
+.maplibregl-popup-close-button {
+  color: var(--color-text-muted) !important;
+  font-size: 16px !important;
+}
+
+/* Restrained pulse used only for the LIVE status dot — a radar/heartbeat cue,
+   not a decorative animation. */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.82); }
+}
+.animate-live-pulse {
+  animation: live-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes sweep-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-sweep-in {
+  animation: sweep-in 0.25s ease-out;
+}

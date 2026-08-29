@@ -1,0 +1,1524 @@
+{
+  "grid_cols": 6,
+  "grid_rows": 6,
+  "zones": [
+    {
+      "zone_id": "AND-01",
+      "name": "Janaradan Rajimhatre Marg x Pujya Mahatma Gandhi Gram Marg",
+      "grid": {
+        "col": 0,
+        "row": 2
+      },
+      "centroid": [
+        72.818677,
+        19.114583
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.82422438333333,
+              19.1093573
+            ],
+            [
+              72.82422438333333,
+              19.11980875
+            ],
+            [
+              72.8131298,
+              19.11980875
+            ],
+            [
+              72.8131298,
+              19.1093573
+            ],
+            [
+              72.82422438333333,
+              19.1093573
+            ]
+          ]
+        ]
+      },
+      "edge_count": 22,
+      "static_factors": {
+        "slope": 0.021628898421519705,
+        "distance_to_waterway_m": 58.425983694418655,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 135.58371403098124
+      }
+    },
+    {
+      "zone_id": "AND-02",
+      "name": "Jai Prakash Road x Balasaheb Sawant Road",
+      "grid": {
+        "col": 0,
+        "row": 3
+      },
+      "centroid": [
+        72.818677,
+        19.125034
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.82422438333333,
+              19.11980875
+            ],
+            [
+              72.82422438333333,
+              19.130260200000002
+            ],
+            [
+              72.8131298,
+              19.130260200000002
+            ],
+            [
+              72.8131298,
+              19.11980875
+            ],
+            [
+              72.82422438333333,
+              19.11980875
+            ]
+          ]
+        ]
+      },
+      "edge_count": 198,
+      "static_factors": {
+        "slope": 0.020735442445373994,
+        "distance_to_waterway_m": 13.390543222307684,
+        "drain_density": 0.04040404040404041,
+        "distance_to_drain_m": 78.0824442445212
+      }
+    },
+    {
+      "zone_id": "AND-03",
+      "name": "Popco Colony Road x Badrinath Tower Road",
+      "grid": {
+        "col": 0,
+        "row": 4
+      },
+      "centroid": [
+        72.818677,
+        19.135486
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.82422438333333,
+              19.130260200000002
+            ],
+            [
+              72.82422438333333,
+              19.14071165
+            ],
+            [
+              72.8131298,
+              19.14071165
+            ],
+            [
+              72.8131298,
+              19.130260200000002
+            ],
+            [
+              72.82422438333333,
+              19.130260200000002
+            ]
+          ]
+        ]
+      },
+      "edge_count": 275,
+      "static_factors": {
+        "slope": 0.02078758184320285,
+        "distance_to_waterway_m": 8.909310126288505,
+        "drain_density": 0.24363636363636362,
+        "distance_to_drain_m": 3.3259536553698625
+      }
+    },
+    {
+      "zone_id": "AND-04",
+      "name": "Cross Road Number 3 x BMC Marg",
+      "grid": {
+        "col": 0,
+        "row": 5
+      },
+      "centroid": [
+        72.818677,
+        19.145937
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.82422438333333,
+              19.14071165
+            ],
+            [
+              72.82422438333333,
+              19.1511631
+            ],
+            [
+              72.8131298,
+              19.1511631
+            ],
+            [
+              72.8131298,
+              19.14071165
+            ],
+            [
+              72.82422438333333,
+              19.14071165
+            ]
+          ]
+        ]
+      },
+      "edge_count": 64,
+      "static_factors": {
+        "slope": 0.020720459164307738,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 562.5098354582068
+      }
+    },
+    {
+      "zone_id": "AND-05",
+      "name": "Juhu Tara Road x Relief Road",
+      "grid": {
+        "col": 1,
+        "row": 0
+      },
+      "centroid": [
+        72.829772,
+        19.09368
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.83531896666666,
+              19.0884544
+            ],
+            [
+              72.83531896666666,
+              19.09890585
+            ],
+            [
+              72.82422438333333,
+              19.09890585
+            ],
+            [
+              72.82422438333333,
+              19.0884544
+            ],
+            [
+              72.83531896666666,
+              19.0884544
+            ]
+          ]
+        ]
+      },
+      "edge_count": 127,
+      "static_factors": {
+        "slope": 0.02046718277925862,
+        "distance_to_waterway_m": 38.50875820142072,
+        "drain_density": 0.14173228346456693,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-06",
+      "name": "N. S. Road No. 5 x Vaikunthlal Mehta Road",
+      "grid": {
+        "col": 1,
+        "row": 1
+      },
+      "centroid": [
+        72.829772,
+        19.104132
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.83531896666666,
+              19.09890585
+            ],
+            [
+              72.83531896666666,
+              19.1093573
+            ],
+            [
+              72.82422438333333,
+              19.1093573
+            ],
+            [
+              72.82422438333333,
+              19.09890585
+            ],
+            [
+              72.83531896666666,
+              19.09890585
+            ]
+          ]
+        ]
+      },
+      "edge_count": 249,
+      "static_factors": {
+        "slope": 0.019926599036861344,
+        "distance_to_waterway_m": 8.628551262290479,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 54.68393813842044
+      }
+    },
+    {
+      "zone_id": "AND-07",
+      "name": "Samarth Ramdas Marg x Guru Nanak Road",
+      "grid": {
+        "col": 1,
+        "row": 2
+      },
+      "centroid": [
+        72.829772,
+        19.114583
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.83531896666666,
+              19.1093573
+            ],
+            [
+              72.83531896666666,
+              19.11980875
+            ],
+            [
+              72.82422438333333,
+              19.11980875
+            ],
+            [
+              72.82422438333333,
+              19.1093573
+            ],
+            [
+              72.83531896666666,
+              19.1093573
+            ]
+          ]
+        ]
+      },
+      "edge_count": 504,
+      "static_factors": {
+        "slope": 0.01983930964445846,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.2698412698412698,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-08",
+      "name": "Jai Prakash Road x Link Road",
+      "grid": {
+        "col": 1,
+        "row": 3
+      },
+      "centroid": [
+        72.829772,
+        19.125034
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.83531896666666,
+              19.11980875
+            ],
+            [
+              72.83531896666666,
+              19.130260200000002
+            ],
+            [
+              72.82422438333333,
+              19.130260200000002
+            ],
+            [
+              72.82422438333333,
+              19.11980875
+            ],
+            [
+              72.83531896666666,
+              19.11980875
+            ]
+          ]
+        ]
+      },
+      "edge_count": 350,
+      "static_factors": {
+        "slope": 0.020892359121213556,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.3057142857142857,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-09",
+      "name": "Link Road x Pramod Navalkar Road",
+      "grid": {
+        "col": 1,
+        "row": 4
+      },
+      "centroid": [
+        72.829772,
+        19.135486
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.83531896666666,
+              19.130260200000002
+            ],
+            [
+              72.83531896666666,
+              19.14071165
+            ],
+            [
+              72.82422438333333,
+              19.14071165
+            ],
+            [
+              72.82422438333333,
+              19.130260200000002
+            ],
+            [
+              72.83531896666666,
+              19.130260200000002
+            ]
+          ]
+        ]
+      },
+      "edge_count": 235,
+      "static_factors": {
+        "slope": 0.020785080741105615,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.13191489361702127,
+        "distance_to_drain_m": 3.4580459059797857
+      }
+    },
+    {
+      "zone_id": "AND-10",
+      "name": "Kavi Ram Basakhetre Road x Lokmanya Balgangadhar Tilak Marg",
+      "grid": {
+        "col": 1,
+        "row": 5
+      },
+      "centroid": [
+        72.829772,
+        19.145937
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.83531896666666,
+              19.14071165
+            ],
+            [
+              72.83531896666666,
+              19.1511631
+            ],
+            [
+              72.82422438333333,
+              19.1511631
+            ],
+            [
+              72.82422438333333,
+              19.14071165
+            ],
+            [
+              72.83531896666666,
+              19.14071165
+            ]
+          ]
+        ]
+      },
+      "edge_count": 327,
+      "static_factors": {
+        "slope": 0.02177917009700872,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 308.88085533421577
+      }
+    },
+    {
+      "zone_id": "AND-11",
+      "name": "Swami Vivekanand Road x Vallabhbhai Road",
+      "grid": {
+        "col": 2,
+        "row": 0
+      },
+      "centroid": [
+        72.840866,
+        19.09368
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.84641355,
+              19.0884544
+            ],
+            [
+              72.84641355,
+              19.09890585
+            ],
+            [
+              72.83531896666666,
+              19.09890585
+            ],
+            [
+              72.83531896666666,
+              19.0884544
+            ],
+            [
+              72.84641355,
+              19.0884544
+            ]
+          ]
+        ]
+      },
+      "edge_count": 385,
+      "static_factors": {
+        "slope": 0.02044954949560389,
+        "distance_to_waterway_m": 192.80457326465284,
+        "drain_density": 0.07272727272727272,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-12",
+      "name": "Swami Vivekanand Road x Gulmohar Road",
+      "grid": {
+        "col": 2,
+        "row": 1
+      },
+      "centroid": [
+        72.840866,
+        19.104132
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.84641355,
+              19.09890585
+            ],
+            [
+              72.84641355,
+              19.1093573
+            ],
+            [
+              72.83531896666666,
+              19.1093573
+            ],
+            [
+              72.83531896666666,
+              19.09890585
+            ],
+            [
+              72.84641355,
+              19.09890585
+            ]
+          ]
+        ]
+      },
+      "edge_count": 341,
+      "static_factors": {
+        "slope": 0.019791466330101024,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.0967741935483871,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-13",
+      "name": "CD Barfiwala Road x Swami Vivekanand Road",
+      "grid": {
+        "col": 2,
+        "row": 2
+      },
+      "centroid": [
+        72.840866,
+        19.114583
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.84641355,
+              19.1093573
+            ],
+            [
+              72.84641355,
+              19.11980875
+            ],
+            [
+              72.83531896666666,
+              19.11980875
+            ],
+            [
+              72.83531896666666,
+              19.1093573
+            ],
+            [
+              72.84641355,
+              19.1093573
+            ]
+          ]
+        ]
+      },
+      "edge_count": 295,
+      "static_factors": {
+        "slope": 0.01991258819987752,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.13559322033898305,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-14",
+      "name": "Jai Prakash Road x Ceasar Road",
+      "grid": {
+        "col": 2,
+        "row": 3
+      },
+      "centroid": [
+        72.840866,
+        19.125034
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.84641355,
+              19.11980875
+            ],
+            [
+              72.84641355,
+              19.130260200000002
+            ],
+            [
+              72.83531896666666,
+              19.130260200000002
+            ],
+            [
+              72.83531896666666,
+              19.11980875
+            ],
+            [
+              72.84641355,
+              19.11980875
+            ]
+          ]
+        ]
+      },
+      "edge_count": 372,
+      "static_factors": {
+        "slope": 0.02010799810499149,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.005376344086021506,
+        "distance_to_drain_m": 97.5483436346672
+      }
+    },
+    {
+      "zone_id": "AND-15",
+      "name": "Captain Samant Marg x Sahakar Road",
+      "grid": {
+        "col": 2,
+        "row": 4
+      },
+      "centroid": [
+        72.840866,
+        19.135486
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.84641355,
+              19.130260200000002
+            ],
+            [
+              72.84641355,
+              19.14071165
+            ],
+            [
+              72.83531896666666,
+              19.14071165
+            ],
+            [
+              72.83531896666666,
+              19.130260200000002
+            ],
+            [
+              72.84641355,
+              19.130260200000002
+            ]
+          ]
+        ]
+      },
+      "edge_count": 291,
+      "static_factors": {
+        "slope": 0.019873494556789786,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.10652920962199312,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-16",
+      "name": "Swami Vivekanand Road x Behrambaug Road",
+      "grid": {
+        "col": 2,
+        "row": 5
+      },
+      "centroid": [
+        72.840866,
+        19.145937
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.84641355,
+              19.14071165
+            ],
+            [
+              72.84641355,
+              19.1511631
+            ],
+            [
+              72.83531896666666,
+              19.1511631
+            ],
+            [
+              72.83531896666666,
+              19.14071165
+            ],
+            [
+              72.84641355,
+              19.14071165
+            ]
+          ]
+        ]
+      },
+      "edge_count": 537,
+      "static_factors": {
+        "slope": 0.02081734736874078,
+        "distance_to_waterway_m": 0.0,
+        "drain_density": 0.3240223463687151,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-17",
+      "name": "Nehru Road x Airport Flyover",
+      "grid": {
+        "col": 3,
+        "row": 0
+      },
+      "centroid": [
+        72.851961,
+        19.09368
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.85750813333334,
+              19.0884544
+            ],
+            [
+              72.85750813333334,
+              19.09890585
+            ],
+            [
+              72.84641355,
+              19.09890585
+            ],
+            [
+              72.84641355,
+              19.0884544
+            ],
+            [
+              72.85750813333334,
+              19.0884544
+            ]
+          ]
+        ]
+      },
+      "edge_count": 196,
+      "static_factors": {
+        "slope": 0.01994790101957926,
+        "distance_to_waterway_m": 708.328534010602,
+        "drain_density": 0.46938775510204084,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-18",
+      "name": "Western Express Highway x Hanuman Mandir Road",
+      "grid": {
+        "col": 3,
+        "row": 1
+      },
+      "centroid": [
+        72.851961,
+        19.104132
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.85750813333334,
+              19.09890585
+            ],
+            [
+              72.85750813333334,
+              19.1093573
+            ],
+            [
+              72.84641355,
+              19.1093573
+            ],
+            [
+              72.84641355,
+              19.09890585
+            ],
+            [
+              72.85750813333334,
+              19.09890585
+            ]
+          ]
+        ]
+      },
+      "edge_count": 387,
+      "static_factors": {
+        "slope": 0.020373146451703822,
+        "distance_to_waterway_m": 378.1775135119364,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 173.4237824261573
+      }
+    },
+    {
+      "zone_id": "AND-19",
+      "name": "Andheri Flyover x Sahar Road",
+      "grid": {
+        "col": 3,
+        "row": 2
+      },
+      "centroid": [
+        72.851961,
+        19.114583
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.85750813333334,
+              19.1093573
+            ],
+            [
+              72.85750813333334,
+              19.11980875
+            ],
+            [
+              72.84641355,
+              19.11980875
+            ],
+            [
+              72.84641355,
+              19.1093573
+            ],
+            [
+              72.85750813333334,
+              19.1093573
+            ]
+          ]
+        ]
+      },
+      "edge_count": 577,
+      "static_factors": {
+        "slope": 0.020357206404967892,
+        "distance_to_waterway_m": 398.0216575644285,
+        "drain_density": 0.1559792027729636,
+        "distance_to_drain_m": 11.020744985029497
+      }
+    },
+    {
+      "zone_id": "AND-20",
+      "name": "Western Express Highway x Swami Vivekanand Road",
+      "grid": {
+        "col": 3,
+        "row": 3
+      },
+      "centroid": [
+        72.851961,
+        19.125034
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.85750813333334,
+              19.11980875
+            ],
+            [
+              72.85750813333334,
+              19.130260200000002
+            ],
+            [
+              72.84641355,
+              19.130260200000002
+            ],
+            [
+              72.84641355,
+              19.11980875
+            ],
+            [
+              72.85750813333334,
+              19.11980875
+            ]
+          ]
+        ]
+      },
+      "edge_count": 455,
+      "static_factors": {
+        "slope": 0.020385503030980353,
+        "distance_to_waterway_m": 428.48843209685987,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 404.1341575063021
+      }
+    },
+    {
+      "zone_id": "AND-21",
+      "name": "Balasaheb Thackeray Flyover x Station Road",
+      "grid": {
+        "col": 3,
+        "row": 4
+      },
+      "centroid": [
+        72.851961,
+        19.135486
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.85750813333334,
+              19.130260200000002
+            ],
+            [
+              72.85750813333334,
+              19.14071165
+            ],
+            [
+              72.84641355,
+              19.14071165
+            ],
+            [
+              72.84641355,
+              19.130260200000002
+            ],
+            [
+              72.85750813333334,
+              19.130260200000002
+            ]
+          ]
+        ]
+      },
+      "edge_count": 355,
+      "static_factors": {
+        "slope": 0.020363661785911636,
+        "distance_to_waterway_m": 479.61192715543655,
+        "drain_density": 0.6957746478873239,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-22",
+      "name": "Western Express Highway x Shree Ram Mandir Road",
+      "grid": {
+        "col": 3,
+        "row": 5
+      },
+      "centroid": [
+        72.851961,
+        19.145937
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.85750813333334,
+              19.14071165
+            ],
+            [
+              72.85750813333334,
+              19.1511631
+            ],
+            [
+              72.84641355,
+              19.1511631
+            ],
+            [
+              72.84641355,
+              19.14071165
+            ],
+            [
+              72.85750813333334,
+              19.14071165
+            ]
+          ]
+        ]
+      },
+      "edge_count": 247,
+      "static_factors": {
+        "slope": 0.020761612367661664,
+        "distance_to_waterway_m": 164.49291035703388,
+        "drain_density": 0.3643724696356275,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-23",
+      "name": "V K Krishna Marg x I A Project road",
+      "grid": {
+        "col": 4,
+        "row": 0
+      },
+      "centroid": [
+        72.863055,
+        19.09368
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.86860271666667,
+              19.0884544
+            ],
+            [
+              72.86860271666667,
+              19.09890585
+            ],
+            [
+              72.85750813333334,
+              19.09890585
+            ],
+            [
+              72.85750813333334,
+              19.0884544
+            ],
+            [
+              72.86860271666667,
+              19.0884544
+            ]
+          ]
+        ]
+      },
+      "edge_count": 18,
+      "static_factors": {
+        "slope": 0.018154755856215135,
+        "distance_to_waterway_m": 96.993439158128,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 482.37495697800205
+      }
+    },
+    {
+      "zone_id": "AND-24",
+      "name": "V K Krishna Marg x Sahar Road Underpass",
+      "grid": {
+        "col": 4,
+        "row": 1
+      },
+      "centroid": [
+        72.863055,
+        19.104132
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.86860271666667,
+              19.09890585
+            ],
+            [
+              72.86860271666667,
+              19.1093573
+            ],
+            [
+              72.85750813333334,
+              19.1093573
+            ],
+            [
+              72.85750813333334,
+              19.09890585
+            ],
+            [
+              72.86860271666667,
+              19.09890585
+            ]
+          ]
+        ]
+      },
+      "edge_count": 399,
+      "static_factors": {
+        "slope": 0.0206511380081997,
+        "distance_to_waterway_m": 19.475775736918276,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-25",
+      "name": "Mathuradas Vasanji Road x Guru Hargovindji Road",
+      "grid": {
+        "col": 4,
+        "row": 2
+      },
+      "centroid": [
+        72.863055,
+        19.114583
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.86860271666667,
+              19.1093573
+            ],
+            [
+              72.86860271666667,
+              19.11980875
+            ],
+            [
+              72.85750813333334,
+              19.11980875
+            ],
+            [
+              72.85750813333334,
+              19.1093573
+            ],
+            [
+              72.86860271666667,
+              19.1093573
+            ]
+          ]
+        ]
+      },
+      "edge_count": 233,
+      "static_factors": {
+        "slope": 0.019205356601847745,
+        "distance_to_waterway_m": 627.1192359868725,
+        "drain_density": 0.12446351931330472,
+        "distance_to_drain_m": 25.511105084987914
+      }
+    },
+    {
+      "zone_id": "AND-26",
+      "name": "Mahakali Caves Road x Guru Gobind Singh Marg",
+      "grid": {
+        "col": 4,
+        "row": 3
+      },
+      "centroid": [
+        72.863055,
+        19.125034
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.86860271666667,
+              19.11980875
+            ],
+            [
+              72.86860271666667,
+              19.130260200000002
+            ],
+            [
+              72.85750813333334,
+              19.130260200000002
+            ],
+            [
+              72.85750813333334,
+              19.11980875
+            ],
+            [
+              72.86860271666667,
+              19.11980875
+            ]
+          ]
+        ]
+      },
+      "edge_count": 267,
+      "static_factors": {
+        "slope": 0.021602269347856286,
+        "distance_to_waterway_m": 541.4122617966365,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 570.179177803818
+      }
+    },
+    {
+      "zone_id": "AND-27",
+      "name": "MHB Colony Rd x Sant Gadge Maharaj Marg",
+      "grid": {
+        "col": 4,
+        "row": 4
+      },
+      "centroid": [
+        72.863055,
+        19.135486
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.86860271666667,
+              19.130260200000002
+            ],
+            [
+              72.86860271666667,
+              19.14071165
+            ],
+            [
+              72.85750813333334,
+              19.14071165
+            ],
+            [
+              72.85750813333334,
+              19.130260200000002
+            ],
+            [
+              72.86860271666667,
+              19.130260200000002
+            ]
+          ]
+        ]
+      },
+      "edge_count": 285,
+      "static_factors": {
+        "slope": 0.020731755310599908,
+        "distance_to_waterway_m": 7.406766047457458,
+        "drain_density": 1.1368421052631579,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-28",
+      "name": "Raginvar road x Nirmalatai Raginvar road",
+      "grid": {
+        "col": 4,
+        "row": 5
+      },
+      "centroid": [
+        72.863055,
+        19.145937
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.86860271666667,
+              19.14071165
+            ],
+            [
+              72.86860271666667,
+              19.1511631
+            ],
+            [
+              72.85750813333334,
+              19.1511631
+            ],
+            [
+              72.85750813333334,
+              19.14071165
+            ],
+            [
+              72.86860271666667,
+              19.14071165
+            ]
+          ]
+        ]
+      },
+      "edge_count": 18,
+      "static_factors": {
+        "slope": 0.02166250924627414,
+        "distance_to_waterway_m": 250.67470782447822,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 128.47139653881905
+      }
+    },
+    {
+      "zone_id": "AND-29",
+      "name": "Sahar Elevated Road x Marol Pipeline Road",
+      "grid": {
+        "col": 5,
+        "row": 1
+      },
+      "centroid": [
+        72.87415,
+        19.104132
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.8796973,
+              19.09890585
+            ],
+            [
+              72.8796973,
+              19.1093573
+            ],
+            [
+              72.86860271666667,
+              19.1093573
+            ],
+            [
+              72.86860271666667,
+              19.09890585
+            ],
+            [
+              72.8796973,
+              19.09890585
+            ]
+          ]
+        ]
+      },
+      "edge_count": 131,
+      "static_factors": {
+        "slope": 0.020447487003074066,
+        "distance_to_waterway_m": 3.6102019481842684,
+        "drain_density": 1.2366412213740459,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-30",
+      "name": "Mathuradas Vasanji Road (Andheri Kurla Road) x Marol Pipeline Road",
+      "grid": {
+        "col": 5,
+        "row": 2
+      },
+      "centroid": [
+        72.87415,
+        19.114583
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.8796973,
+              19.1093573
+            ],
+            [
+              72.8796973,
+              19.11980875
+            ],
+            [
+              72.86860271666667,
+              19.11980875
+            ],
+            [
+              72.86860271666667,
+              19.1093573
+            ],
+            [
+              72.8796973,
+              19.1093573
+            ]
+          ]
+        ]
+      },
+      "edge_count": 274,
+      "static_factors": {
+        "slope": 0.019289402439088315,
+        "distance_to_waterway_m": 259.7644540804722,
+        "drain_density": 0.33211678832116787,
+        "distance_to_drain_m": 0.0
+      }
+    },
+    {
+      "zone_id": "AND-31",
+      "name": "Krantiveer Lakhuji Salve Marg x Cross Road C",
+      "grid": {
+        "col": 5,
+        "row": 3
+      },
+      "centroid": [
+        72.87415,
+        19.125034
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.8796973,
+              19.11980875
+            ],
+            [
+              72.8796973,
+              19.130260200000002
+            ],
+            [
+              72.86860271666667,
+              19.130260200000002
+            ],
+            [
+              72.86860271666667,
+              19.11980875
+            ],
+            [
+              72.8796973,
+              19.11980875
+            ]
+          ]
+        ]
+      },
+      "edge_count": 141,
+      "static_factors": {
+        "slope": 0.0210773623404666,
+        "distance_to_waterway_m": 70.16711300065882,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 471.0852165701592
+      }
+    },
+    {
+      "zone_id": "AND-32",
+      "name": "Sardar Vallabhbhai Patel Road x Mahakali Caves Road",
+      "grid": {
+        "col": 5,
+        "row": 4
+      },
+      "centroid": [
+        72.87415,
+        19.135486
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.8796973,
+              19.130260200000002
+            ],
+            [
+              72.8796973,
+              19.14071165
+            ],
+            [
+              72.86860271666667,
+              19.14071165
+            ],
+            [
+              72.86860271666667,
+              19.130260200000002
+            ],
+            [
+              72.8796973,
+              19.130260200000002
+            ]
+          ]
+        ]
+      },
+      "edge_count": 116,
+      "static_factors": {
+        "slope": 0.01979339128911731,
+        "distance_to_waterway_m": 21.909512838688936,
+        "drain_density": 0.1206896551724138,
+        "distance_to_drain_m": 2.2985929525898987
+      }
+    },
+    {
+      "zone_id": "AND-33",
+      "name": "Aarey Colony Road Belt",
+      "grid": {
+        "col": 5,
+        "row": 5
+      },
+      "centroid": [
+        72.87415,
+        19.145937
+      ],
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.8796973,
+              19.14071165
+            ],
+            [
+              72.8796973,
+              19.1511631
+            ],
+            [
+              72.86860271666667,
+              19.1511631
+            ],
+            [
+              72.86860271666667,
+              19.14071165
+            ],
+            [
+              72.8796973,
+              19.14071165
+            ]
+          ]
+        ]
+      },
+      "edge_count": 16,
+      "static_factors": {
+        "slope": 0.02194501217389455,
+        "distance_to_waterway_m": 54.478143079787685,
+        "drain_density": 0.0,
+        "distance_to_drain_m": 283.5766742812554
+      }
+    }
+  ]
+}

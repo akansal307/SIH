@@ -1,0 +1,16 @@
+# Requirements for the offline data-pipeline scripts in this folder.
+# These scripts are NOT part of the frontend app runtime — they are run
+# once (or whenever the source model/graph assets change) to regenerate
+# the static files consumed by the frontend from data/source/*.
+#
+#   pip install -r scripts/requirements.txt --break-system-packages
+#
+networkx==3.6.1
+geopandas==1.1.4
+shapely==2.1.2
+pyproj==3.7.2
+lightgbm==4.7.0
+scikit-learn==1.8.0
+joblib==1.5.3
+numpy==2.4.4
+pandas==3.0.2
