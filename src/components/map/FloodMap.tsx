@@ -97,7 +97,10 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
 
       // Real Andheri road network, derived from edge_cache.pkl (see
       // scripts/build_zones.py) — context layer, not interactive.
-      map.addSource("roads", { type: "geojson", data: "/data/andheri_roads.geojson" });
+      map.addSource("roads", {
+  type: "geojson",
+  data: `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
+});
       map.addLayer({
         id: "roads-line",
         type: "line",
