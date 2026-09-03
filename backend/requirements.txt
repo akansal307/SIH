@@ -1,0 +1,20 @@
+# Backend API (the live-serving app in app/) — separate from scripts/requirements.txt,
+# which is only for the offline demo-data pipeline.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+python-dotenv==1.0.1
+
+# Model + spatial cache
+joblib==1.5.3
+numpy==2.4.4
+pandas==3.0.2
+lightgbm==4.7.0
+scikit-learn==1.8.0
+geopandas==1.1.4
+shapely==2.1.2
+pyproj==3.7.2
+
+# Real road-graph routing
+networkx==3.6.1
