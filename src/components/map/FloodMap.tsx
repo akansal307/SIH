@@ -32,7 +32,7 @@ const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", feature
  * delay or entirely prevent 'load' from firing — silently blanking the whole map,
  * flood layers included. Using an inline style guarantees 'load' fires immediately,
  * so zones/roads/routes are always visible regardless of network conditions. The
- * CARTO basemap (see CARTO_RASTER_TILES below) is then layered in underneath as a
+ * OSM basemap (see OSM_RASTER_TILES below) is then layered in underneath as a
  * best-effort visual enhancement that cannot block or break the core map.
  */
 const BASE_STYLE: StyleSpecification = {
@@ -42,19 +42,22 @@ const BASE_STYLE: StyleSpecification = {
 };
 
 /**
- * Free CARTO raster basemap tiles — no API key required. Used instead of raw
- * OpenStreetMap tiles per the brief's explicit instruction ("do NOT use the public
- * OpenStreetMap tile server directly if it causes 403/blocking; use a reliable
- * basemap provider"). Added as a plain `raster` source (not a full remote style JSON)
- * so a failed/blocked tile request only leaves that one tile blank — it can never
- * break the flood-risk visualization on top, unlike loading a whole remote style as
- * the map's root style would (see BASE_STYLE above).
+ * Free, keyless OpenStreetMap standard raster tiles. Switched from CARTO's
+ * "keyless" dark_all endpoint after CARTO began serving "API KEY REQUIRED"
+ * watermark tiles on every anonymous request (Aug 2026) — their free tier now
+ * requires signup. OSM's own tile server remains free and keyless. Added as a plain
+ * `raster` source (not a full remote style JSON) so a failed/blocked tile request
+ * only leaves that one tile blank — it can never break the flood-risk visualization
+ * on top, unlike loading a whole remote style as the map's root style would (see
+ * BASE_STYLE above).
+ *
+ * Note: OSM's standard style is light-themed, not dark like CARTO's dark_all — if
+ * you want a dark basemap back, sign up for a free CARTO or Mapbox API key instead.
  */
-const CARTO_RASTER_TILES = [
-  "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-  "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-  "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-  "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+const OSM_RASTER_TILES = [
+  "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
 ];
 
 /**
@@ -92,15 +95,15 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
       // Best-effort basemap. Deliberately added first and with no error handling
       // beyond MapLibre's own per-tile fallback (blank tile) — its failure must never
       // block the flood layers below from rendering.
-      map.addSource("carto-basemap", { type: "raster", tiles: CARTO_RASTER_TILES, tileSize: 256 });
-      map.addLayer({ id: "carto-basemap-layer", type: "raster", source: "carto-basemap", paint: { "raster-opacity": 0.85 } });
+      map.addSource("osm-basemap", { type: "raster", tiles: OSM_RASTER_TILES, tileSize: 256 });
+      map.addLayer({ id: "osm-basemap-layer", type: "raster", source: "osm-basemap", paint: { "raster-opacity": 0.85 } });
 
       // Real Andheri road network, derived from edge_cache.pkl (see
       // scripts/build_zones.py) — context layer, not interactive.
       map.addSource("roads", {
-  type: "geojson",
-  data: `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
-});
+        type: "geojson",
+        data: `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
+      });
       map.addLayer({
         id: "roads-line",
         type: "line",
