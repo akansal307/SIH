@@ -40,7 +40,8 @@ class ModelArtifacts:
     thresholds: dict
     feature_cols: list
     zones: list[dict]          # each: zone_id, name, centroid, geometry, edge_count, static_factors
-    zones_source: str          # "edge_cache" or "derived_fallback" — for observability
+    zones_source: str         # "edge_cache" or "derived_fallback" — for observability
+    streets: list[dict]        # each: edge_id, static_factors — one per road edge (no aggregation)
 
 
 # --------------------------------------------------------------------------- #
@@ -139,6 +140,36 @@ def _build_zones_from_edge_cache() -> list[dict]:
     logger.info("Built %d zones from edge_cache.pkl", len(zones))
     return zones
 
+def _load_streets_from_edge_cache() -> list[dict]:
+    """Builds the per-street (per-edge) static feature list — the same real values
+    _build_zones_from_edge_cache() aggregates into 33 zones, but kept at full
+    resolution (one entry per road edge, no spatial averaging)."""
+    cache = joblib.load(config.EDGE_CACHE_PATH)
+    edges = cache["edges"]
+
+    streets = []
+    for _, row in edges.iterrows():
+        edge_id = row.get("edge_id")
+        if edge_id is None:
+            continue
+        slope = row.get("slope")
+        dist_waterway = row.get("distance_to_waterway_m")
+        drain_density = row.get("drain_density")
+        dist_drain = row.get("distance_to_drain_m")
+        if pd.isna(slope) or pd.isna(dist_waterway) or pd.isna(drain_density) or pd.isna(dist_drain):
+            continue
+        streets.append({
+            "edge_id": edge_id,
+            "static_factors": {
+                "slope": float(slope),
+                "distance_to_waterway_m": float(dist_waterway),
+                "drain_density": float(drain_density),
+                "distance_to_drain_m": float(dist_drain),
+            },
+        })
+    logger.info("Loaded %d streets (edges) from edge_cache.pkl", len(streets))
+    return streets
+
 
 def load_artifacts() -> ModelArtifacts:
     """Loads model.pkl, thresholds.pkl, feature_cols.pkl, and the zone spatial cache
@@ -162,6 +193,11 @@ def load_artifacts() -> ModelArtifacts:
         with open(config.ZONES_BASE_FALLBACK_PATH) as f:
             zones = json.load(f)["zones"]
         zones_source = "derived_fallback"
+    try:
+        streets = _load_streets_from_edge_cache()
+    except Exception:
+        logger.exception("Could not load per-street features from edge_cache.pkl.")
+        streets = []
 
     return ModelArtifacts(
         model=model, thresholds=thresholds, feature_cols=feature_cols,
@@ -344,6 +380,45 @@ def evaluate_snapshot(
         rain_peak_3hr_mm=rain_peak3, blockage_percent=blockage_percent,
         max_tide_height_m=max_tide_height_m, num_high_tides=num_high_tides, base_time=base_time,
     )
+
+def build_street_risks(
+    artifacts: ModelArtifacts, *, rain_total_mm: float, rain_hourly_mm: float,
+    rain_peak_3hr_mm: float, max_tide_height_m: float, num_high_tides: int,
+) -> list[dict]:
+    """Runs the exact same real model as build_state_snapshot(), but against every
+    individual street (edge) instead of the 33 aggregated zones."""
+    if not artifacts.streets:
+        return []
+
+    rows = [{
+        "slope": s["static_factors"]["slope"],
+        "distance_to_waterway_m": s["static_factors"]["distance_to_waterway_m"],
+        "drain_density": s["static_factors"]["drain_density"],
+        "distance_to_drain_m": s["static_factors"]["distance_to_drain_m"],
+        "rain_total_mm": rain_total_mm,
+        "rain_max_hourly_mm": rain_hourly_mm,
+        "rain_peak_3hr_mm": rain_peak_3hr_mm,
+        "max_tide_height_m": max_tide_height_m,
+        "num_high_tides": num_high_tides,
+    } for s in artifacts.streets]
+
+    X = pd.DataFrame(rows, columns=artifacts.feature_cols)
+    proba = artifacts.model.predict_proba(X)
+    pred_class = proba.argmax(axis=1)
+
+    results = []
+    for s, static_eff, p, c in zip(artifacts.streets, (s["static_factors"] for s in artifacts.streets), proba, pred_class):
+        risk = config.CLASS_TO_RISK[int(c)]
+        depth_cm, onset_minutes = depth_and_onset(int(c), p, artifacts.thresholds, static_eff)
+        probability = round(float(p[1] + p[2]), 4)
+        results.append({
+            "edge_id": s["edge_id"],
+            "risk": risk,
+            "probability": probability,
+            "depth_cm": depth_cm,
+            "onset_minutes": onset_minutes,
+        })
+    return results
 
 
 def build_scenario_series(artifacts: ModelArtifacts, *, rainfall_mm_hr, duration_min,
