@@ -26,6 +26,7 @@ class AppState:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     latest_current: dict | None = None
     latest_forecast: list | None = None
+    latest_streets: list | None = None
     latest_live_conditions: Any = None
     last_updated: datetime | None = None
     poller_task: asyncio.Task | None = None
