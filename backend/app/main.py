@@ -46,9 +46,20 @@ async def _refresh_live_state(app: FastAPI) -> None:
         live = await weather_service.fetch_live_conditions(cached_tide=st.cached_tide)
         base_time = datetime.now(timezone.utc).replace(microsecond=0)
         current, forecast = model_service.build_live_series(st.artifacts, live=live, base_time=base_time)
+        now_rain = live.forecast_by_offset[0]
+        streets = model_service.build_street_risks(
+          st.artifacts,
+          rain_total_mm=now_rain["rain_total_mm"],
+          rain_hourly_mm=now_rain["rain_max_hourly_mm"],
+          rain_peak_3hr_mm=now_rain["rain_peak_3hr_mm"],
+          max_tide_height_m=live.max_tide_height_m,
+          num_high_tides=live.num_high_tides,
+        )
+          
         async with st.lock:
             st.latest_current = current
             st.latest_forecast = forecast
+            st.latest_streets = streets
             st.latest_live_conditions = live
             st.last_updated = base_time
         logger.info(
@@ -216,6 +227,14 @@ async def get_zone(zone_id: str):
             if feature["properties"]["zone_id"] == zone_id:
                 return feature
     raise HTTPException(status_code=404, detail=f"Unknown zone_id: {zone_id}")
+
+@app.get("/api/flood/streets")
+async def get_streets():
+    st = _get_state()
+    if not st.is_ready():
+        raise HTTPException(status_code=503, detail="Live flood state not ready yet — try again shortly.")
+    async with st.lock:
+        return st.latest_streets or []
 
 
 @app.get("/api/routes/safe")
