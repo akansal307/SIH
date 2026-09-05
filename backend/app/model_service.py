@@ -201,7 +201,7 @@ def load_artifacts() -> ModelArtifacts:
 
     return ModelArtifacts(
         model=model, thresholds=thresholds, feature_cols=feature_cols,
-        zones=zones, zones_source=zones_source,
+        zones=zones, zones_source=zones_source, streets = streets,
     )
 
 
