@@ -9,12 +9,7 @@ running the team's real `flood_nowcast_model.pkl` against the real Andheri road 
 not hand-typed placeholder values. See [Model Behaviour Notes](#model-behaviour-notes)
 below for exactly what's real and what's a documented assumption.
 
-## 🚀 Live Demo
 
-- **Frontend:** [sihweb-gules.vercel.app](https://sih-1t6v.vercel.app/)
-- **Backend API:** [sih-2026-3-817w.onrender.com](https://sih-2026-3-817w.onrender.com)
-
----
 
 ## Contents
 
