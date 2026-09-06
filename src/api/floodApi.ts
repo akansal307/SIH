@@ -24,14 +24,17 @@ import type {
   SimulationResult,
   SimulationPresetWire,
   SimulationScenarioInput,
+  StreetRisk,
+  StreetRiskWire,
   ZoneFeatureWire,
 } from "../types/flood";
-import { adaptFloodState, adaptSimulationPreset } from "./adapters";
+import { adaptFloodState, adaptSimulationPreset, adaptStreetRisk } from "./adapters";
 import { API_BASE_URL, ApiError, fetchJson, IS_BACKEND_CONFIGURED } from "./client";
 import {
   mockGetCurrentFloodState,
   mockGetForecast,
   mockGetZoneDetails,
+  mockGetStreetRisks,
   mockRunSimulation,
 } from "../data/mockFloodData";
 
@@ -162,5 +165,32 @@ export async function getZoneDetails(zoneId: string): Promise<ApiResult<FloodZon
     }
   }
   const data = await mockGetZoneDetails(zoneId);
+  return { data, connection: "mock" };
+}
+let lastGoodStreetRisks: StreetRisk[] | null = null;
+
+export async function getStreetRisks(): Promise<ApiResult<StreetRisk[]>> {
+  if (IS_BACKEND_CONFIGURED) {
+    try {
+      const wire = await fetchJson<StreetRiskWire[]>(`${API_BASE_URL}/api/flood/streets`);
+      const data = wire.map(adaptStreetRisk);
+      lastGoodStreetRisks = data;
+      return { data, connection: "connected" };
+    } catch (err) {
+      return fallbackStreetRisks(err);
+    }
+  }
+  return fallbackStreetRisks(null);
+}
+
+async function fallbackStreetRisks(err: unknown): Promise<ApiResult<StreetRisk[]>> {
+  if (lastGoodStreetRisks) {
+    return {
+      data: lastGoodStreetRisks,
+      connection: "offline",
+      error: err instanceof Error ? err.message : "Backend not configured — showing last known street forecast.",
+    };
+  }
+  const data = await mockGetStreetRisks();
   return { data, connection: "mock" };
 }
