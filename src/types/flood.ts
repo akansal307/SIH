@@ -312,3 +312,18 @@ export interface ApiResult<T> {
    * fallback rather than a fresh response. */
   error?: string;
 }
+export interface StreetRiskWire {
+  edge_id: string;
+  risk: RiskLevel;
+  probability: number;
+  depth_cm: number | null;
+  onset_minutes: number | null;
+}
+
+export interface StreetRisk {
+  edgeId: string;
+  risk: RiskLevel;
+  probability: number;
+  depthCm: number | null;
+  onsetMinutes: number | null;
+}
