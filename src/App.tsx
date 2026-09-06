@@ -1,21 +1,27 @@
 import { useState } from "react";
 import type { RouteRecommendation } from "./types/flood";
+
 import { useFloodData } from "./hooks/useFloodData";
 import { useSimulation } from "./hooks/useSimulation";
+
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBanner } from "./components/layout/StatusBanner";
 import { FloodMap } from "./components/map/FloodMap";
+
 import { RiskPanel } from "./components/panels/RiskPanel";
 import { WeatherPanel } from "./components/panels/WeatherPanel";
 import { LiveAlerts } from "./components/panels/LiveAlerts";
+import { ZoneDetails } from "./components/panels/ZoneDetails";
 import { StreetDetails } from "./components/panels/StreetDetails";
 import { RoutePanel } from "./components/panels/RoutePanel";
+
 import { SimulationPanel } from "./components/controls/SimulationPanel";
 import { ForecastTimeline } from "./components/timeline/ForecastTimeline";
 
 export default function App() {
   const floodData = useFloodData();
   const simulation = useSimulation();
+
   const [activeRoute, setActiveRoute] =
     useState<RouteRecommendation | null>(null);
 
@@ -39,6 +45,9 @@ export default function App() {
       <div className="flex flex-1 min-h-0">
         <main className="flex-1 min-w-0 relative">
           <FloodMap
+            zones={floodData.currentState?.zones ?? []}
+            selectedZoneId={floodData.selectedZoneId}
+            onSelectZone={floodData.selectZone}
             selectedStreetId={floodData.selectedStreetId}
             onSelectStreet={floodData.selectStreet}
             activeRoute={activeRoute}
@@ -59,6 +68,11 @@ export default function App() {
                 }
               />
             )}
+
+            <ZoneDetails
+              zone={floodData.selectedZone}
+              onClose={() => floodData.selectZone(null)}
+            />
 
             <StreetDetails
               street={floodData.selectedStreet}
