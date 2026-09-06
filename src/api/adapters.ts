@@ -141,3 +141,12 @@ export function adaptRoute(r: RouteExampleWire): RouteRecommendation {
     recommendation: r.recommendation,
   };
 }
+export function adaptStreetRisk(wire: StreetRiskWire): StreetRisk {
+  return {
+    edgeId: wire.edge_id,
+    risk: wire.risk,
+    probability: wire.probability,
+    depthCm: wire.depth_cm,
+    onsetMinutes: wire.onset_minutes,
+  };
+}
