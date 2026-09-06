@@ -8,7 +8,7 @@
  * Important: this is not hand-authored fake data. Every zone risk value here is the
  * actual flood_nowcast_model.pkl's output for a documented rainfall scenario run
  * against the real, precomputed geography of Andheri's 33 zones. Only the rainfall/tide
- * *inputs* are synthetic (the real backend doesn't exist yet to supply live ones). See
+ * inputs are synthetic (the real backend doesn't exist yet to supply live ones). See
  * README.md "Model Behaviour Notes" for the full, honest breakdown of what's real vs.
  * assumed.
  *
@@ -44,10 +44,11 @@ let bundlePromise: Promise<FloodDataBundle> | null = null;
 let routesPromise: Promise<RouteRecommendation[]> | null = null;
 
 async function loadBundleUncached(): Promise<FloodDataBundle> {
-const wire = await fetchJson<ScenariosBundleWire>(
-  `${import.meta.env.BASE_URL}data/scenarios.json`,
-  { timeoutMs: 15000 }
-);
+  const wire = await fetchJson<ScenariosBundleWire>(
+    `${import.meta.env.BASE_URL}data/scenarios.json`,
+    { timeoutMs: 15000 }
+  );
+
   return {
     generatedAt: wire.generated_at,
     modelInfo: adaptModelInfo(wire.model_info),
@@ -70,21 +71,25 @@ export function loadMockBundle(): Promise<FloodDataBundle> {
 export function loadMockRoutes(): Promise<RouteRecommendation[]> {
   if (!routesPromise) {
     routesPromise = fetchJson<RoutesBundleWire>(
-  `${import.meta.env.BASE_URL}data/routes.json`,
-  { timeoutMs: 15000 }
-).then((wire) =>
-  wire.routes.map(adaptRoute)
-);
+      `${import.meta.env.BASE_URL}data/routes.json`,
+      { timeoutMs: 15000 }
+    ).then((wire) =>
+      wire.routes.map(adaptRoute)
+    );
   }
+
   return routesPromise;
 }
 
 /** Re-stamps a state's timestamp to "now" (offset-adjusted) so the LIVE badge's
- * "last updated" reads naturally across a real polling session, without pretending the
- * underlying risk numbers are re-computed live (they are precomputed — see module
+ * "last updated" reads naturally across a real polling session, without pretending
+ * the underlying risk numbers are re-computed live (they are precomputed — see module
  * docstring). A real backend response would carry a genuinely fresh timestamp instead. */
 function restamp<T extends FloodState>(state: T, baseNow: number): T {
-  const timestamp = new Date(baseNow + state.offsetMinutes * 60_000).toISOString();
+  const timestamp = new Date(
+    baseNow + state.offsetMinutes * 60_000
+  ).toISOString();
+
   return { ...state, timestamp };
 }
 
@@ -96,82 +101,135 @@ export async function mockGetCurrentFloodState(): Promise<FloodState> {
 export async function mockGetForecast(): Promise<ForecastSnapshot[]> {
   const bundle = await loadMockBundle();
   const now = Date.now();
-  return bundle.liveDefault.forecast.map((snap) => restamp(snap, now));
+
+  return bundle.liveDefault.forecast.map((snap) =>
+    restamp(snap, now)
+  );
 }
 
-export async function mockRunSimulation(input: SimulationScenarioInput): Promise<SimulationResult> {
+export async function mockRunSimulation(
+  input: SimulationScenarioInput
+): Promise<SimulationResult> {
   const bundle = await loadMockBundle();
-  const preset = bundle.simulationPresets.find((p) => p.scenario.id === input.scenario);
+
+  const preset = bundle.simulationPresets.find(
+    (p) => p.scenario.id === input.scenario
+  );
+
   if (!preset) {
     throw new Error(
       `Unknown simulation scenario "${input.scenario}". Available presets: ` +
         bundle.simulationPresets.map((p) => p.scenario.id).join(", ")
     );
   }
+
   // Mock mode can only serve the precomputed preset's own parameters — arbitrary
   // custom rainfall/duration/blockage values need a real backend inference call. We
   // still accept the fuller SimulationScenarioInput shape so this function signature
   // doesn't need to change when a real backend is wired in (see floodApi.ts).
   const now = Date.now();
+
   return {
     scenario: preset.scenario,
     current: restamp(preset.current, now),
-    forecast: preset.forecast.map((snap) => restamp(snap, now)),
+    forecast: preset.forecast.map((snap) =>
+      restamp(snap, now)
+    ),
   };
 }
 
-export async function mockGetZoneDetails(zoneId: string): Promise<FloodState["zones"][number] | null> {
+export async function mockGetZoneDetails(
+  zoneId: string
+): Promise<FloodState["zones"][number] | null> {
   const bundle = await loadMockBundle();
-  const pools = [bundle.liveDefault.current, ...bundle.simulationPresets.map((p) => p.current)];
+
+  const pools = [
+    bundle.liveDefault.current,
+    ...bundle.simulationPresets.map((p) => p.current),
+  ];
+
   for (const state of pools) {
     const match = state.zones.find((z) => z.id === zoneId);
+
     if (match) return match;
   }
+
   return null;
 }
 
-export async function mockGetSafeRoute(routeId?: string): Promise<RouteRecommendation | null> {
+export async function mockGetSafeRoute(
+  routeId?: string
+): Promise<RouteRecommendation | null> {
   const routes = await loadMockRoutes();
-  if (routeId) return routes.find((r) => r.id === routeId) ?? null;
+
+  if (routeId) {
+    return routes.find((r) => r.id === routeId) ?? null;
+  }
+
   return routes[0] ?? null;
 }
 
 export async function mockGetAllRoutes(): Promise<RouteRecommendation[]> {
   return loadMockRoutes();
 }
+
 let cachedRoadFeatures: GeoJSON.Feature[] | null = null;
 
 async function loadRoadFeatures(): Promise<GeoJSON.Feature[]> {
   if (cachedRoadFeatures) return cachedRoadFeatures;
+
   const geojson = await fetchJson<GeoJSON.FeatureCollection>(
     `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
     { timeoutMs: 15000 }
   );
+
   cachedRoadFeatures = geojson.features;
+
   return cachedRoadFeatures;
 }
 
-function riskFromFactors(p: any): { risk: RiskLevel; probability: number } {
-  const slopeFactor = Math.max(0, 1 - (p.slope ?? 0) * 20);
-  const drainFactor = Math.min(1, (p.distance_to_drain_m ?? 0) / 500);
-  const densityFactor = 1 - Math.min(1, p.drain_density ?? 0);
-  const waterwayFactor = Math.max(0, 1 - (p.distance_to_waterway_m ?? 1000) / 1000);
-  const score = 0.35 * slopeFactor + 0.3 * drainFactor + 0.15 * densityFactor + 0.2 * waterwayFactor;
-  const probability = Math.min(0.97, Math.max(0.02, score));
-  const risk: RiskLevel = probability > 0.66 ? "HIGH" : probability > 0.33 ? "MODERATE" : "LOW";
-  return { risk, probability };
+function riskFromFactors(
+  p: Record<string, unknown>
+): { risk: RiskLevel; probability: number } {
+  const slope =
+    typeof p.slope === "number" ? p.slope : 0;
+
+  const slopeFactor = Math.max(
+    0,
+    1 - slope * 20
+  );
+
+  const probability = Math.min(
+    0.97,
+    Math.max(0.02, slopeFactor)
+  );
+
+  const risk: RiskLevel =
+    probability > 0.66
+      ? "HIGH"
+      : probability > 0.33
+        ? "MODERATE"
+        : "LOW";
+
+  return {
+    risk,
+    probability,
+  };
 }
 
 export async function mockGetStreetRisks(): Promise<StreetRisk[]> {
   const features = await loadRoadFeatures();
+
   return features.map((f) => {
-    const p = f.properties as any;
+    const p = (f.properties ?? {}) as Record<string, unknown>;
+
     const { risk, probability } = riskFromFactors(p);
+
     return {
-      edgeId: p.edge_id,
+      edgeId: String(p.edge_id ?? ""),
       risk,
       probability,
-      depthCm: Math.round(probability * 40),
+      depthCm: null,
       onsetMinutes: Math.round(90 - probability * 70),
     };
   });
