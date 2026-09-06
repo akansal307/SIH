@@ -2,7 +2,7 @@ import { MapPin, X } from "lucide-react";
 import type { FloodZone } from "../../types/flood";
 import { Panel } from "../common/Panel";
 import { RiskBadge } from "../common/RiskBadge";
-import { FACTOR_LABELS, RISK_COLORS, formatDepth, formatFactorValue, formatMinutes } from "../../utils/riskUtils";
+import { FACTOR_LABELS, RISK_COLORS, formatFactorValue, formatMinutes } from "../../utils/riskUtils";
 
 interface ZoneDetailsProps {
   zone: FloodZone | null;
@@ -63,15 +63,9 @@ export function ZoneDetails({ zone, onClose }: ZoneDetailsProps) {
           <p className="text-[10px] font-mono text-text-faint mt-0.5">{zone.id}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 text-xs py-2 border-y border-hairline-soft">
-          <div>
-            <div className="text-text-faint">Predicted depth</div>
-            <div className="font-mono text-text-primary text-sm">{formatDepth(zone.depthCm)}</div>
-          </div>
-          <div>
-            <div className="text-text-faint">Expected onset</div>
-            <div className="font-mono text-text-primary text-sm">{formatMinutes(zone.onsetMinutes)}</div>
-          </div>
+        <div className="py-2 border-y border-hairline-soft text-xs">
+          <div className="text-text-faint">Expected onset</div>
+          <div className="font-mono text-text-primary text-sm">{formatMinutes(zone.onsetMinutes)}</div>
         </div>
 
         <div className="space-y-1.5">
@@ -94,7 +88,7 @@ export function ZoneDetails({ zone, onClose }: ZoneDetailsProps) {
         </div>
 
         <p className="text-[10px] text-text-faint pt-1 border-t border-hairline-soft leading-relaxed">
-          Depth and onset are estimated from the model's risk probability and this zone's
+          Onset is estimated from the model's risk probability and this zone's
           real drainage proximity (see README "Model Behaviour Notes") — the classifier
           itself predicts risk class, not depth.
         </p>
