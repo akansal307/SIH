@@ -2,7 +2,7 @@ import { Bell, BellOff } from "lucide-react";
 import type { Alert } from "../../types/flood";
 import { Panel } from "../common/Panel";
 import { InlineEmpty, InlineLoading } from "../common/StateNotices";
-import { RISK_COLORS, formatDepth, formatMinutes } from "../../utils/riskUtils";
+import { RISK_COLORS, formatMinutes } from "../../utils/riskUtils";
 
 interface LiveAlertsProps {
   alerts: Alert[];
@@ -56,9 +56,6 @@ export function LiveAlerts({ alerts, isLoading, selectedZoneId, onSelectZone }: 
                     </span>
                   </div>
                   <div className="text-xs text-text-primary font-medium mt-0.5 truncate">{alert.zoneName}</div>
-                  <div className="text-[11px] text-text-faint mt-0.5">
-                    Predicted depth: {formatDepth(alert.depthCm)}
-                  </div>
                 </button>
               </li>
             );
