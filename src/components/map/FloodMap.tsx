@@ -9,24 +9,49 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { RouteRecommendation } from "../../types/flood";
-import { ANDHERI_BOUNDS, ANDHERI_CENTER, joinStreetRisksToRoads } from "../../utils/mapUtils";
+
+import type { FloodZone, RouteRecommendation } from "../../types/flood";
+import {
+  ANDHERI_BOUNDS,
+  ANDHERI_CENTER,
+  zonesToFeatureCollection,
+  joinStreetRisksToRoads,
+} from "../../utils/mapUtils";
 import { RISK_COLORS } from "../../utils/riskUtils";
 import { getStreetRisks } from "../../api/floodApi";
 import { MapLegend } from "./MapLegend";
 
 interface FloodMapProps {
+  zones: FloodZone[];
+  selectedZoneId: string | null;
+  onSelectZone: (zoneId: string | null) => void;
+
   selectedStreetId: string | null;
-  onSelectStreet: (edgeId: string | null, point?: [number, number] | null) => void;
+  onSelectStreet: (
+    edgeId: string | null,
+    point?: [number, number] | null
+  ) => void;
+
   activeRoute: RouteRecommendation | null;
 }
 
-const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+const EMPTY_FC: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
 
 const BASE_STYLE: StyleSpecification = {
   version: 8,
   sources: {},
-  layers: [{ id: "background", type: "background", paint: { "background-color": "#0a0f1a" } }],
+  layers: [
+    {
+      id: "background",
+      type: "background",
+      paint: {
+        "background-color": "#0a0f1a",
+      },
+    },
+  ],
 };
 
 const OSM_RASTER_TILES = [
@@ -35,11 +60,21 @@ const OSM_RASTER_TILES = [
   "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
 ];
 
-export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: FloodMapProps) {
+export function FloodMap({
+  zones,
+  selectedZoneId,
+  onSelectZone,
+  selectedStreetId,
+  onSelectStreet,
+  activeRoute,
+}: FloodMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
-  const prevSelectedRef = useRef<string | null>(null);
+
+  const prevSelectedZoneRef = useRef<string | null>(null);
+  const prevSelectedStreetRef = useRef<string | null>(null);
+
   const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
@@ -52,21 +87,114 @@ export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: Floo
       zoom: 12.5,
       attributionControl: { compact: true },
     });
-    mapRef.current = map;
-    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
-    map.fitBounds(ANDHERI_BOUNDS, { padding: 32, duration: 0 });
 
-    popupRef.current = new Popup({ closeButton: false, closeOnClick: false, maxWidth: "220px" });
+    mapRef.current = map;
+
+    map.addControl(
+      new NavigationControl({ showCompass: false }),
+      "top-right"
+    );
+
+    map.fitBounds(ANDHERI_BOUNDS, {
+      padding: 32,
+      duration: 0,
+    });
+
+    popupRef.current = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      maxWidth: "220px",
+    });
 
     map.on("load", () => {
-      map.addSource("osm-basemap", { type: "raster", tiles: OSM_RASTER_TILES, tileSize: 256 });
-      map.addLayer({ id: "osm-basemap-layer", type: "raster", source: "osm-basemap", paint: { "raster-opacity": 0.85 } });
+      // ---------------------------------------------------------------------
+      // BASEMAP
+      // ---------------------------------------------------------------------
+
+      map.addSource("osm-basemap", {
+        type: "raster",
+        tiles: OSM_RASTER_TILES,
+        tileSize: 256,
+      });
+
+      map.addLayer({
+        id: "osm-basemap-layer",
+        type: "raster",
+        source: "osm-basemap",
+        paint: {
+          "raster-opacity": 0.85,
+        },
+      });
+
+      // ---------------------------------------------------------------------
+      // FLOOD-RISK ZONES
+      // Keep the original flood monitoring layer.
+      // ---------------------------------------------------------------------
+
+      map.addSource("zones", {
+        type: "geojson",
+        data: EMPTY_FC,
+        promoteId: "zoneId",
+      });
+
+      map.addLayer({
+        id: "zones-fill",
+        type: "fill",
+        source: "zones",
+        paint: {
+          "fill-color": [
+            "match",
+            ["get", "risk"],
+            "HIGH",
+            RISK_COLORS.HIGH,
+            "MODERATE",
+            RISK_COLORS.MODERATE,
+            RISK_COLORS.LOW,
+          ],
+          "fill-opacity": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            0.52,
+            0.25,
+          ],
+        },
+      });
+
+      map.addLayer({
+        id: "zones-outline",
+        type: "line",
+        source: "zones",
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "risk"],
+            "HIGH",
+            RISK_COLORS.HIGH,
+            "MODERATE",
+            RISK_COLORS.MODERATE,
+            RISK_COLORS.LOW,
+          ],
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            3,
+            1,
+          ],
+          "line-opacity": 0.9,
+        },
+      });
+
+      // ---------------------------------------------------------------------
+      // STREET NETWORK
+      // Added on top of flood zones.
+      // ---------------------------------------------------------------------
 
       map.addSource("roads", {
         type: "geojson",
         data: `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
         promoteId: "edge_id",
       });
+
       map.addLayer({
         id: "roads-line",
         type: "line",
@@ -81,22 +209,46 @@ export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: Floo
             RISK_COLORS.MODERATE,
             RISK_COLORS.LOW,
           ],
-          "line-opacity": ["case", ["boolean", ["feature-state", "selected"], false], 1, 0.8],
+          "line-opacity": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            1,
+            0.9,
+          ],
           "line-width": [
             "case",
             ["boolean", ["feature-state", "selected"], false],
             5,
-            ["match", ["get", "highway"], ["trunk", "primary", "motorway"], 3, ["secondary", "tertiary"], 2, 1.4],
+            [
+              "match",
+              ["get", "highway"],
+              ["trunk", "primary", "motorway"],
+              3,
+              ["secondary", "tertiary"],
+              2,
+              1.4,
+            ],
           ],
         },
       });
 
-      map.addSource("route-fastest", { type: "geojson", data: EMPTY_FC });
+      // ---------------------------------------------------------------------
+      // ROUTES
+      // ---------------------------------------------------------------------
+
+      map.addSource("route-fastest", {
+        type: "geojson",
+        data: EMPTY_FC,
+      });
+
       map.addLayer({
         id: "route-fastest-line",
         type: "line",
         source: "route-fastest",
-        layout: { "line-cap": "round", "line-join": "round" },
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
         paint: {
           "line-color": "#94a2b8",
           "line-width": 3,
@@ -104,56 +256,186 @@ export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: Floo
           "line-opacity": 0.9,
         },
       });
-      map.addSource("route-safe", { type: "geojson", data: EMPTY_FC });
+
+      map.addSource("route-safe", {
+        type: "geojson",
+        data: EMPTY_FC,
+      });
+
       map.addLayer({
         id: "route-safe-line",
         type: "line",
         source: "route-safe",
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#2fb8c6", "line-width": 4.5, "line-opacity": 0.95 },
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "#2fb8c6",
+          "line-width": 4.5,
+          "line-opacity": 0.95,
+        },
       });
 
-      const handleStreetClick = (e: MapLayerMouseEvent) => {
-        const feature = e.features?.[0] as MapGeoJSONFeature | undefined;
+      // ---------------------------------------------------------------------
+      // ZONE CLICK
+      // ---------------------------------------------------------------------
+
+      const handleZoneClick = (e: MapLayerMouseEvent) => {
+        const feature = e.features?.[0] as
+          | MapGeoJSONFeature
+          | undefined;
+
         if (feature?.properties) {
-          onSelectStreet(String(feature.properties.edge_id), [e.lngLat.lng, e.lngLat.lat]);
+          onSelectZone(String(feature.properties.zoneId));
         }
       };
-      const handleMapClick = (e: MapLayerMouseEvent) => {
-        const hits = map.queryRenderedFeatures(e.point, { layers: ["roads-line"] });
-        if (hits.length === 0) onSelectStreet(null, null);
+
+      // ---------------------------------------------------------------------
+      // STREET CLICK
+      // ---------------------------------------------------------------------
+
+      const handleStreetClick = (e: MapLayerMouseEvent) => {
+        const feature = e.features?.[0] as
+          | MapGeoJSONFeature
+          | undefined;
+
+        if (feature?.properties) {
+          onSelectStreet(
+            String(feature.properties.edge_id),
+            [e.lngLat.lng, e.lngLat.lat]
+          );
+        }
       };
-      const handleMouseMove = (e: MapLayerMouseEvent) => {
+
+      // ---------------------------------------------------------------------
+      // MAP CLICK
+      // ---------------------------------------------------------------------
+
+      const handleMapClick = (e: MapLayerMouseEvent) => {
+        const zoneHits = map.queryRenderedFeatures(e.point, {
+          layers: ["zones-fill"],
+        });
+
+        const streetHits = map.queryRenderedFeatures(e.point, {
+          layers: ["roads-line"],
+        });
+
+        if (zoneHits.length === 0) {
+          onSelectZone(null);
+        }
+
+        if (streetHits.length === 0) {
+          onSelectStreet(null, null);
+        }
+      };
+
+      // ---------------------------------------------------------------------
+      // ZONE HOVER
+      // ---------------------------------------------------------------------
+
+      const handleZoneMouseMove = (e: MapLayerMouseEvent) => {
         map.getCanvas().style.cursor = "pointer";
-        const f = e.features?.[0];
-        if (!f?.properties || !popupRef.current) return;
-        const { name, highway, risk, probability } = f.properties as {
-          name: string;
-          highway: string;
-          risk: string;
-          probability: number;
+
+        const feature = e.features?.[0];
+
+        if (!feature?.properties || !popupRef.current) return;
+
+        const properties = feature.properties as {
+          zoneName?: string;
+          name?: string;
+          risk?: string;
+          probability?: number;
         };
-        const label = name && name !== "NaN" ? name : highway;
+
+        const zoneName =
+          properties.zoneName ??
+          properties.name ??
+          "Flood-risk zone";
+
+        const risk = properties.risk ?? "LOW";
+        const probability =
+          typeof properties.probability === "number"
+            ? properties.probability
+            : 0;
+
         popupRef.current
           .setLngLat(e.lngLat)
           .setHTML(
             `<div style="font-family:var(--font-sans);min-width:150px">` +
-              `<div style="font-weight:600;font-size:12px;margin-bottom:2px">${label}</div>` +
-              `<div style="font-size:11px;color:${RISK_COLORS[risk as "LOW" | "MODERATE" | "HIGH"]}">${risk} · ${Math.round(
+              `<div style="font-weight:600;font-size:12px;margin-bottom:2px">${zoneName}</div>` +
+              `<div style="font-size:11px;color:${
+                RISK_COLORS[
+                  risk as "LOW" | "MODERATE" | "HIGH"
+                ]
+              }">${risk} · ${Math.round(
                 probability * 100
               )}% flood probability</div>` +
               `</div>`
           )
           .addTo(map);
       };
+
+      // ---------------------------------------------------------------------
+      // STREET HOVER
+      // ---------------------------------------------------------------------
+
+      const handleStreetMouseMove = (e: MapLayerMouseEvent) => {
+        map.getCanvas().style.cursor = "pointer";
+
+        const feature = e.features?.[0];
+
+        if (!feature?.properties || !popupRef.current) return;
+
+        const properties = feature.properties as {
+          name?: string;
+          highway?: string;
+          risk?: string;
+          probability?: number;
+        };
+
+        const label =
+          properties.name &&
+          properties.name !== "NaN"
+            ? properties.name
+            : properties.highway ?? "Street";
+
+        const risk = properties.risk ?? "LOW";
+        const probability =
+          typeof properties.probability === "number"
+            ? properties.probability
+            : 0;
+
+        popupRef.current
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div style="font-family:var(--font-sans);min-width:150px">` +
+              `<div style="font-weight:600;font-size:12px;margin-bottom:2px">${label}</div>` +
+              `<div style="font-size:11px;color:${
+                RISK_COLORS[
+                  risk as "LOW" | "MODERATE" | "HIGH"
+                ]
+              }">${risk} · ${Math.round(
+                probability * 100
+              )}% flood probability</div>` +
+              `</div>`
+          )
+          .addTo(map);
+      };
+
       const handleMouseLeave = () => {
         map.getCanvas().style.cursor = "";
         popupRef.current?.remove();
       };
 
+      map.on("click", "zones-fill", handleZoneClick);
       map.on("click", "roads-line", handleStreetClick);
       map.on("click", handleMapClick);
-      map.on("mousemove", "roads-line", handleMouseMove);
+
+      map.on("mousemove", "zones-fill", handleZoneMouseMove);
+      map.on("mousemove", "roads-line", handleStreetMouseMove);
+
+      map.on("mouseleave", "zones-fill", handleMouseLeave);
       map.on("mouseleave", "roads-line", handleMouseLeave);
 
       setIsMapReady(true);
@@ -165,24 +447,59 @@ export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: Floo
       mapRef.current = null;
       setIsMapReady(false);
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // -------------------------------------------------------------------------
+  // FLOOD ZONES
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
-    const map = mapRef.current;
 
+    const source = mapRef.current.getSource("zones");
+
+    if (source && "setData" in source) {
+      (source as GeoJSONSource).setData(
+        zonesToFeatureCollection(zones)
+      );
+    }
+  }, [isMapReady, zones]);
+
+  // -------------------------------------------------------------------------
+  // STREET RISKS
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) return;
+
+    const map = mapRef.current;
     let cancelled = false;
+
     (async () => {
-      const [roadsRes, risksRes] = await Promise.all([
-        fetch(`${import.meta.env.BASE_URL}data/andheri_roads.geojson`).then((r) => r.json()),
-        getStreetRisks(),
-      ]);
-      if (cancelled) return;
-      const joined = joinStreetRisksToRoads(roadsRes, risksRes.data);
-      const source = map.getSource("roads");
-      if (source && "setData" in source) {
-        (source as GeoJSONSource).setData(joined);
+      try {
+        const [roadsRes, risksRes] = await Promise.all([
+          fetch(
+            `${import.meta.env.BASE_URL}data/andheri_roads.geojson`
+          ).then((r) => r.json()),
+          getStreetRisks(),
+        ]);
+
+        if (cancelled) return;
+
+        const joined = joinStreetRisksToRoads(
+          roadsRes,
+          risksRes.data
+        );
+
+        const source = map.getSource("roads");
+
+        if (source && "setData" in source) {
+          (source as GeoJSONSource).setData(joined);
+        }
+      } catch {
+        // Keep the road network visible if street-risk loading fails.
       }
     })();
 
@@ -191,35 +508,102 @@ export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: Floo
     };
   }, [isMapReady]);
 
-  useEffect(() => {
-    if (!isMapReady || !mapRef.current) return;
-    const map = mapRef.current;
-    if (prevSelectedRef.current) {
-      map.setFeatureState({ source: "roads", id: prevSelectedRef.current }, { selected: false });
-    }
-    if (selectedStreetId) {
-      map.setFeatureState({ source: "roads", id: selectedStreetId }, { selected: true });
-    }
-    prevSelectedRef.current = selectedStreetId;
-  }, [isMapReady, selectedStreetId]);
+  // -------------------------------------------------------------------------
+  // SELECTED ZONE
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
+
     const map = mapRef.current;
+
+    if (prevSelectedZoneRef.current) {
+      map.setFeatureState(
+        {
+          source: "zones",
+          id: prevSelectedZoneRef.current,
+        },
+        { selected: false }
+      );
+    }
+
+    if (selectedZoneId) {
+      map.setFeatureState(
+        {
+          source: "zones",
+          id: selectedZoneId,
+        },
+        { selected: true }
+      );
+    }
+
+    prevSelectedZoneRef.current = selectedZoneId;
+  }, [isMapReady, selectedZoneId]);
+
+  // -------------------------------------------------------------------------
+  // SELECTED STREET
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) return;
+
+    const map = mapRef.current;
+
+    if (prevSelectedStreetRef.current) {
+      map.setFeatureState(
+        {
+          source: "roads",
+          id: prevSelectedStreetRef.current,
+        },
+        { selected: false }
+      );
+    }
+
+    if (selectedStreetId) {
+      map.setFeatureState(
+        {
+          source: "roads",
+          id: selectedStreetId,
+        },
+        { selected: true }
+      );
+    }
+
+    prevSelectedStreetRef.current = selectedStreetId;
+  }, [isMapReady, selectedStreetId]);
+
+  // -------------------------------------------------------------------------
+  // ROUTE OVERLAY
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) return;
+
+    const map = mapRef.current;
+
     const fastestSource = map.getSource("route-fastest");
     const safeSource = map.getSource("route-safe");
-    if (!fastestSource || !safeSource || !("setData" in fastestSource)) return;
+
+    if (
+      !fastestSource ||
+      !safeSource ||
+      !("setData" in fastestSource)
+    ) {
+      return;
+    }
 
     if (!activeRoute) {
       (fastestSource as GeoJSONSource).setData(EMPTY_FC);
       (safeSource as GeoJSONSource).setData(EMPTY_FC);
       return;
     }
+
     (fastestSource as GeoJSONSource).setData({
       type: "Feature",
       properties: {},
       geometry: activeRoute.fastest.geometry,
     });
+
     (safeSource as GeoJSONSource).setData({
       type: "Feature",
       properties: {},
@@ -229,7 +613,10 @@ export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: Floo
 
   return (
     <div className="relative w-full h-full">
-      <div ref={containerRef} className="w-full h-full" />
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+      />
       <MapLegend />
     </div>
   );
