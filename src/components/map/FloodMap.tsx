@@ -233,6 +233,26 @@ export function FloodMap({
       });
 
       // ---------------------------------------------------------------------
+      // ROADS HIT LAYER
+      // Invisible, much wider line drawn on top of "roads-line" purely to make
+      // clicking/hovering streets reliable. The visible roads stay thin (real
+      // road widths); this layer is what click/hover handlers actually target,
+      // since MapLibre hit-tests against the *rendered* line width and 1.4px
+      // minor-road lines are too thin to hit with a mouse.
+      // ---------------------------------------------------------------------
+
+      map.addLayer({
+        id: "roads-hit",
+        type: "line",
+        source: "roads",
+        paint: {
+          "line-color": "#000000",
+          "line-opacity": 0,
+          "line-width": 14,
+        },
+      });
+
+      // ---------------------------------------------------------------------
       // ROUTES
       // ---------------------------------------------------------------------
 
@@ -318,7 +338,7 @@ export function FloodMap({
         });
 
         const streetHits = map.queryRenderedFeatures(e.point, {
-          layers: ["roads-line"],
+          layers: ["roads-hit"],
         });
 
         if (zoneHits.length === 0) {
@@ -429,14 +449,14 @@ export function FloodMap({
       };
 
       map.on("click", "zones-fill", handleZoneClick);
-      map.on("click", "roads-line", handleStreetClick);
+      map.on("click", "roads-hit", handleStreetClick);
       map.on("click", handleMapClick);
 
       map.on("mousemove", "zones-fill", handleZoneMouseMove);
-      map.on("mousemove", "roads-line", handleStreetMouseMove);
+      map.on("mousemove", "roads-hit", handleStreetMouseMove);
 
       map.on("mouseleave", "zones-fill", handleMouseLeave);
-      map.on("mouseleave", "roads-line", handleMouseLeave);
+      map.on("mouseleave", "roads-hit", handleMouseLeave);
 
       setIsMapReady(true);
     });
