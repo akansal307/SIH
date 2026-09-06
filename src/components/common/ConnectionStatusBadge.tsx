@@ -37,7 +37,7 @@ export function ConnectionStatusBadge({ mode, connection }: ConnectionStatusBadg
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent">
         <Radio size={13} />
-        Live (demo data)
+        Live
       </span>
     );
   }
