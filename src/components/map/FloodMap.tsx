@@ -128,7 +128,6 @@ export function FloodMap({
 
       // ---------------------------------------------------------------------
       // FLOOD-RISK ZONES
-      // Keep the original flood monitoring layer.
       // ---------------------------------------------------------------------
 
       map.addSource("zones", {
@@ -186,7 +185,6 @@ export function FloodMap({
 
       // ---------------------------------------------------------------------
       // STREET NETWORK
-      // Added on top of flood zones.
       // ---------------------------------------------------------------------
 
       map.addSource("roads", {
@@ -234,11 +232,7 @@ export function FloodMap({
 
       // ---------------------------------------------------------------------
       // ROADS HIT LAYER
-      // Invisible, much wider line drawn on top of "roads-line" purely to make
-      // clicking/hovering streets reliable. The visible roads stay thin (real
-      // road widths); this layer is what click/hover handlers actually target,
-      // since MapLibre hit-tests against the *rendered* line width and 1.4px
-      // minor-road lines are too thin to hit with a mouse.
+      // Invisible wider line used to make road clicking reliable.
       // ---------------------------------------------------------------------
 
       map.addLayer({
@@ -320,16 +314,25 @@ export function FloodMap({
           | MapGeoJSONFeature
           | undefined;
 
-        if (feature?.properties) {
-          onSelectStreet(
-            String(feature.properties.edge_id),
-            [e.lngLat.lng, e.lngLat.lat]
-          );
-        }
+        if (!feature?.properties) return;
+
+        const edgeId = feature.properties.edge_id;
+
+        if (!edgeId) return;
+
+        onSelectStreet(
+          String(edgeId),
+          [e.lngLat.lng, e.lngLat.lat]
+        );
       };
 
       // ---------------------------------------------------------------------
       // MAP CLICK
+      //
+      // Important fix:
+      // The map-level click now directly selects the road when the road
+      // hit-layer is found. This makes street selection reliable even if the
+      // layer-specific click handler doesn't fire.
       // ---------------------------------------------------------------------
 
       const handleMapClick = (e: MapLayerMouseEvent) => {
@@ -341,12 +344,27 @@ export function FloodMap({
           layers: ["roads-hit"],
         });
 
-        if (zoneHits.length === 0) {
-          onSelectZone(null);
+        // If a street was clicked, select it directly.
+        if (streetHits.length > 0) {
+          const feature = streetHits[0] as MapGeoJSONFeature;
+
+          if (feature.properties) {
+            const edgeId = feature.properties.edge_id;
+
+            if (edgeId) {
+              onSelectStreet(
+                String(edgeId),
+                [e.lngLat.lng, e.lngLat.lat]
+              );
+            }
+          }
+        } else {
+          onSelectStreet(null, null);
         }
 
-        if (streetHits.length === 0) {
-          onSelectStreet(null, null);
+        // Keep original zone-selection behavior.
+        if (zoneHits.length === 0) {
+          onSelectZone(null);
         }
       };
 
@@ -374,6 +392,7 @@ export function FloodMap({
           "Flood-risk zone";
 
         const risk = properties.risk ?? "LOW";
+
         const probability =
           typeof properties.probability === "number"
             ? properties.probability
@@ -421,6 +440,7 @@ export function FloodMap({
             : properties.highway ?? "Street";
 
         const risk = properties.risk ?? "LOW";
+
         const probability =
           typeof properties.probability === "number"
             ? properties.probability
@@ -448,15 +468,37 @@ export function FloodMap({
         popupRef.current?.remove();
       };
 
+      // ---------------------------------------------------------------------
+      // EVENT LISTENERS
+      // ---------------------------------------------------------------------
+
       map.on("click", "zones-fill", handleZoneClick);
       map.on("click", "roads-hit", handleStreetClick);
       map.on("click", handleMapClick);
 
-      map.on("mousemove", "zones-fill", handleZoneMouseMove);
-      map.on("mousemove", "roads-hit", handleStreetMouseMove);
+      map.on(
+        "mousemove",
+        "zones-fill",
+        handleZoneMouseMove
+      );
 
-      map.on("mouseleave", "zones-fill", handleMouseLeave);
-      map.on("mouseleave", "roads-hit", handleMouseLeave);
+      map.on(
+        "mousemove",
+        "roads-hit",
+        handleStreetMouseMove
+      );
+
+      map.on(
+        "mouseleave",
+        "zones-fill",
+        handleMouseLeave
+      );
+
+      map.on(
+        "mouseleave",
+        "roads-hit",
+        handleMouseLeave
+      );
 
       setIsMapReady(true);
     });
