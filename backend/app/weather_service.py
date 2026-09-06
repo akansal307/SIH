@@ -49,9 +49,7 @@ OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 TOMORROWIO_URL = "https://api.tomorrow.io/v4/timelines"
 WORLDTIDES_URL = "https://www.worldtides.info/api/v3"
 
-# Documented fallback used only if the live rainfall API call fails (network outage,
-# rate limit, etc.) — mirrors scripts/generate_scenarios.py's LIVE_BASELINE so the
-# server degrades to a known, labelled-as-such baseline instead of crashing.
+
 FALLBACK_RAIN = dict(rain_total_mm=2.25, rain_max_hourly_mm=3.0, rain_peak_3hr_mm=2.25)
 FALLBACK_TIDE = dict(max_tide_height_m=1.1, num_high_tides=0)
 
@@ -61,12 +59,12 @@ class LiveConditions:
     """Real-valued dynamic inputs for evaluate_snapshot(), at NOW and at each forecast
     offset, plus provenance so the API response / logs can say honestly where each
     number came from."""
-    now: dict                      # {rain_total_mm, rain_max_hourly_mm, rain_peak_3hr_mm}
-    forecast_by_offset: dict[int, dict]   # offset_min -> same shape, for 0/30/60/120/180
+    now: dict                      
+    forecast_by_offset: dict[int, dict]   
     max_tide_height_m: float
     num_high_tides: int
-    rain_source: str                # "open-meteo" or "fallback"
-    tide_source: str                # "worldtides" or "fallback"
+    rain_source: str              
+    tide_source: str               
     fetched_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -91,8 +89,8 @@ async def _fetch_open_meteo(client: httpx.AsyncClient) -> dict | None:
 
 
 BUCKET_MINUTES = 15
-BUCKETS_PER_HOUR = 60 // BUCKET_MINUTES     # 4
-BUCKETS_PER_3HR = 180 // BUCKET_MINUTES     # 12
+BUCKETS_PER_HOUR = 60 // BUCKET_MINUTES     
+BUCKETS_PER_3HR = 180 // BUCKET_MINUTES     
 
 
 def _rain_features_from_series(times: list[str], precip_mm: list[float], now: datetime,
@@ -157,9 +155,7 @@ async def _fetch_tomorrowio(client: httpx.AsyncClient) -> dict | None:
     data = resp.json()
     intervals = data["data"]["timelines"][0]["intervals"]
     times = [iv["startTime"] for iv in intervals]
-    # precipitationIntensity is mm/hr; at a 1-hour bucket width, rate * 1h = mm for
-    # that bucket, so it's directly usable as an hourly accumulated-mm series, same
-    # shape as Open-Meteo's "precipitation" field.
+
     precip = [float(iv["values"]["precipitationIntensity"]) for iv in intervals]
     return times, precip
 
@@ -190,10 +186,7 @@ async def _fetch_worldtides(client: httpx.AsyncClient) -> dict | None:
     if highs:
         max_height = max(float(e["height"]) for e in highs)
     elif extremes:
-        # No High in range (shouldn't happen with a 24h window, but guard anyway) —
-        # fall back to the highest extreme of any type rather than silently using
-        # the module-level fallback constant, so a real-but-unusual response is still
-        # reflected instead of masked.
+        
         max_height = max(float(e["height"]) for e in extremes)
     else:
         max_height = FALLBACK_TIDE["max_tide_height_m"]
