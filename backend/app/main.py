@@ -251,3 +251,37 @@ async def get_safe_route(route_id: str = Query(...)):
     if route is None:
         raise HTTPException(status_code=404, detail=f"Unknown route_id: {route_id}")
     return route
+
+@app.get("/api/routes/dynamic")
+async def get_dynamic_route(
+    lon: float = Query(...),
+    lat: float = Query(...),
+):
+    st = _get_state()
+
+    if not st.is_ready():
+        raise HTTPException(
+            status_code=503,
+            detail="Live flood state not ready yet — try again shortly.",
+        )
+
+    async with st.lock:
+        zones_geojson = st.latest_current["zones"]
+        street_risks = st.latest_streets or []
+
+    route = await asyncio.to_thread(
+        routing_service.compute_dynamic_route,
+        st.graph,
+        lon,
+        lat,
+        zones_geojson,
+        street_risks,
+    )
+
+    if route is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No dynamic safe route available from this location.",
+        )
+
+    return route
