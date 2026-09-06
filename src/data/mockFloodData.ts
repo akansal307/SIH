@@ -26,7 +26,10 @@ import type {
   RoutesBundleWire,
   SimulationScenarioInput,
   SimulationResult,
+  RiskLevel,
+  StreetRisk,
 } from "../types/flood";
+
 import {
   adaptFloodState,
   adaptModelInfo,
@@ -34,6 +37,7 @@ import {
   adaptSimulationPreset,
   adaptZoneMeta,
 } from "../api/adapters";
+
 import { fetchJson } from "../api/client";
 
 let bundlePromise: Promise<FloodDataBundle> | null = null;
@@ -134,4 +138,41 @@ export async function mockGetSafeRoute(routeId?: string): Promise<RouteRecommend
 
 export async function mockGetAllRoutes(): Promise<RouteRecommendation[]> {
   return loadMockRoutes();
+}
+let cachedRoadFeatures: GeoJSON.Feature[] | null = null;
+
+async function loadRoadFeatures(): Promise<GeoJSON.Feature[]> {
+  if (cachedRoadFeatures) return cachedRoadFeatures;
+  const geojson = await fetchJson<GeoJSON.FeatureCollection>(
+    `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
+    { timeoutMs: 15000 }
+  );
+  cachedRoadFeatures = geojson.features;
+  return cachedRoadFeatures;
+}
+
+function riskFromFactors(p: any): { risk: RiskLevel; probability: number } {
+  const slopeFactor = Math.max(0, 1 - (p.slope ?? 0) * 20);
+  const drainFactor = Math.min(1, (p.distance_to_drain_m ?? 0) / 500);
+  const densityFactor = 1 - Math.min(1, p.drain_density ?? 0);
+  const waterwayFactor = Math.max(0, 1 - (p.distance_to_waterway_m ?? 1000) / 1000);
+  const score = 0.35 * slopeFactor + 0.3 * drainFactor + 0.15 * densityFactor + 0.2 * waterwayFactor;
+  const probability = Math.min(0.97, Math.max(0.02, score));
+  const risk: RiskLevel = probability > 0.66 ? "HIGH" : probability > 0.33 ? "MODERATE" : "LOW";
+  return { risk, probability };
+}
+
+export async function mockGetStreetRisks(): Promise<StreetRisk[]> {
+  const features = await loadRoadFeatures();
+  return features.map((f) => {
+    const p = f.properties as any;
+    const { risk, probability } = riskFromFactors(p);
+    return {
+      edgeId: p.edge_id,
+      risk,
+      probability,
+      depthCm: Math.round(probability * 40),
+      onsetMinutes: Math.round(90 - probability * 70),
+    };
+  });
 }
