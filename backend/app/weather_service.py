@@ -79,8 +79,8 @@ async def _fetch_open_meteo(client: httpx.AsyncClient) -> dict | None:
         "latitude": config.ANDHERI_LAT,
         "longitude": config.ANDHERI_LON,
         "minutely_15": "precipitation",
-        "past_minutely_15": 12,      # 3 hours of history, in 15-min steps
-        "forecast_minutely_15": 16,  # 4 hours ahead, in 15-min steps
+        "past_minutely_15": 12,     
+        "forecast_minutely_15": 16, 
         "timezone": "UTC",
     }
     resp = await client.get(OPEN_METEO_URL, params=params, timeout=10.0)
@@ -176,7 +176,7 @@ async def _fetch_worldtides(client: httpx.AsyncClient) -> dict | None:
         "lat": config.ANDHERI_LAT,
         "lon": config.ANDHERI_LON,
         "key": config.WORLDTIDES_API_KEY,
-        "length": 86400,  # 24 hours, seconds — guarantees >=1 High in range
+        "length": 86400,  
     }
     resp = await client.get(WORLDTIDES_URL, params=params, timeout=10.0)
     resp.raise_for_status()
