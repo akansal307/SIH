@@ -10,11 +10,12 @@ import os
 
 from dotenv import load_dotenv
 
+
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
-HERE = os.path.dirname(os.path.abspath(__file__))          # backend/app
-BACKEND_ROOT = os.path.dirname(HERE)                        # backend/
-ROOT = os.path.dirname(BACKEND_ROOT)                        # repo root
+HERE = os.path.dirname(os.path.abspath(__file__))          
+BACKEND_ROOT = os.path.dirname(HERE)                       
+ROOT = os.path.dirname(BACKEND_ROOT)                       
 
 DATA_SOURCE = os.path.join(ROOT, "data", "source")
 MODEL_PATH = os.path.join(DATA_SOURCE, "flood_nowcast_model.pkl")
@@ -23,42 +24,32 @@ FEATURE_COLS_PATH = os.path.join(DATA_SOURCE, "flood_nowcast_feature_cols.pkl")
 EDGE_CACHE_PATH = os.path.join(DATA_SOURCE, "edge_cache.pkl")
 GRAPHML_PATH = os.path.join(DATA_SOURCE, "city_graph_with_elevation (1).graphml")
 
-# Fallback if the live edge_cache-derived zone grid can't be rebuilt for some reason
-# (e.g. geopandas unavailable at runtime) — reuse the checked-in derived file that the
-# offline pipeline already produced from the same edge_cache.pkl.
+
 ZONES_BASE_FALLBACK_PATH = os.path.join(ROOT, "data", "derived", "zones_base.json")
 
 FORECAST_OFFSETS_MIN = [0, 30, 60, 120, 180]
 
-# Empirically-inferred class -> risk label mapping (see scripts/verify_class_mapping.py
-# and README.md "Model Behaviour Notes"). classes_ is [0, 1, 2] with no label metadata
-# in the pickle. TODO(model team): confirm this against training code / label encoder.
+
 CLASS_TO_RISK = {0: "LOW", 1: "MODERATE", 2: "HIGH"}
 
-# Andheri, Mumbai — used as the point location for the live rainfall API call.
+
 ANDHERI_LAT = float(os.environ.get("ANDHERI_LAT", "19.1197"))
 ANDHERI_LON = float(os.environ.get("ANDHERI_LON", "72.8468"))
 
-# How often the background poller refreshes live rainfall + recomputes the current/
-# forecast snapshots, in seconds. Open-Meteo's own data updates roughly hourly, so
-# there is no value in polling faster than a few minutes.
+
 WEATHER_POLL_INTERVAL_SECONDS = int(os.environ.get("WEATHER_POLL_INTERVAL_SECONDS", "300"))
 
-# Tide refreshes on its own, much slower loop — independent of rainfall. WorldTides'
-# free tier has a tight monthly call quota, and tides don't meaningfully change on a
-# 5-minute timescale anyway. Default: 30 minutes.
+
 TIDE_POLL_INTERVAL_SECONDS = int(os.environ.get("TIDE_POLL_INTERVAL_SECONDS", "1800"))
 
-# Optional: a real tide provider (e.g. WorldTides) needs an API key we don't have by
-# default. If unset, tide is a documented constant fallback — same honesty pattern the
-# offline scripts/generate_scenarios.py already uses for this exact input. See
-# weather_service.py.
+
+TOMORROWIO_API_KEY = os.environ.get("TOMORROWIO_API_KEY", "")
+
 WORLDTIDES_API_KEY = os.environ.get("WORLDTIDES_API_KEY", "")
 
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")
 
-# Fixed demo origin/destination pairs for /api/routes/safe (same set as
-# scripts/build_routes.py, kept in sync intentionally — see routing_service.py).
+
 ROUTE_OD_PAIRS = {
     "station-to-marol": dict(
         label="Andheri Station -> Marol Naka (MIDC)",
@@ -77,9 +68,7 @@ ROUTE_OD_PAIRS = {
     ),
 }
 
-# Same named presets scripts/generate_scenarios.py ships, so POST /api/flood/simulate
-# with {"scenario": "extreme_cloudburst"} behaves identically to the offline pipeline.
-# The frontend's SIMULATION_PRESETS list (src/data) already has matching ids/labels.
+
 SIMULATION_PRESETS = {
     "normal_rain": dict(
         label="Normal Rain", description="Typical monsoon drizzle. Most streets stay clear.",
