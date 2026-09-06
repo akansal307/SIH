@@ -8,7 +8,6 @@
  * backend are expected to speak the same wire shape, so this adapter works for either
  * without modification — that's the whole point of isolating it here.
  */
-
 import type {
   Alert,
   AlertWire,
@@ -23,6 +22,8 @@ import type {
   RouteExampleWire,
   SimulationPresetWire,
   SimulationResult,
+  StreetRisk,
+  StreetRiskWire,
   ZoneFeatureWire,
   ZoneMeta,
   ZoneMetaWire,
