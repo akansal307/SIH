@@ -119,12 +119,8 @@ export function RoutePanel({
     dismissed ? null : route;
 
   useEffect(() => {
-    onRouteChange?.(activeRoute);
-
-    return () => {
-      onRouteChange?.(null);
-    };
-  }, [activeRoute, onRouteChange]);
+  onRouteChange?.(activeRoute);
+}, [activeRoute, onRouteChange]);
 
   const isElevatedRisk =
     streetRisk &&
