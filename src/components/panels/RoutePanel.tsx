@@ -1,30 +1,46 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigation, ShieldCheck, Zap, X } from "lucide-react";
-import type { RouteOption, RouteRecommendation, StreetRisk } from "../../types/flood";
+import type {
+  RouteOption,
+  RouteRecommendation,
+  StreetRisk,
+} from "../../types/flood";
+
 import { Panel } from "../common/Panel";
 import { RiskBadge } from "../common/RiskBadge";
 import { InlineError, InlineLoading } from "../common/StateNotices";
-import { getAllRoutes } from "../../api/routeApi";
-import { selectBestRouteForPoint } from "../../utils/routeSelection";
+import { getDynamicRoute } from "../../api/routeApi";
 
-function RouteCard({ option, highlight }: { option: RouteOption; highlight: boolean }) {
+function RouteCard({
+  option,
+  highlight,
+}: {
+  option: RouteOption;
+  highlight: boolean;
+}) {
   const Icon = option.type === "fastest" ? Zap : ShieldCheck;
+
   return (
     <div
       className={`flex-1 rounded-md border px-3 py-2.5 ${
-        highlight ? "border-accent bg-accent-soft" : "border-hairline bg-panel-raised"
+        highlight
+          ? "border-accent bg-accent-soft"
+          : "border-hairline bg-panel-raised"
       }`}
     >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-text-faint font-semibold">
         <Icon size={11} />
         {option.type === "fastest" ? "Fastest" : "Flood-safe"}
       </div>
+
       <div className="text-lg font-display font-semibold text-text-primary mt-1">
         {option.durationMin} min
       </div>
+
       <div className="text-[11px] text-text-faint">
         {option.distanceKm.toFixed(2)} km
       </div>
+
       <div className="mt-1.5">
         <RiskBadge risk={option.risk} size="sm" />
       </div>
@@ -38,72 +54,99 @@ interface RoutePanelProps {
   onRouteChange?: (route: RouteRecommendation | null) => void;
 }
 
-export function RoutePanel({ streetRisk, point, onRouteChange }: RoutePanelProps) {
-  const [routes, setRoutes] = useState<RouteRecommendation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function RoutePanel({
+  streetRisk,
+  point,
+  onRouteChange,
+}: RoutePanelProps) {
+  const [route, setRoute] =
+    useState<RouteRecommendation | null>(null);
 
-  const [dismissed, setDismissed] = useState(false);
-  const lastStreetId = useRef<string | null>(null);
+  const [isLoading, setIsLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [dismissed, setDismissed] =
+    useState(false);
 
   useEffect(() => {
-    if (streetRisk?.edgeId !== lastStreetId.current) {
-      lastStreetId.current = streetRisk?.edgeId ?? null;
-      setDismissed(false);
+    setDismissed(false);
+    setError(null);
+    setRoute(null);
+
+    // No clicked street = no dynamic route.
+    if (!point) {
+      setIsLoading(false);
+      onRouteChange?.(null);
+      return;
     }
-  }, [streetRisk?.edgeId]);
 
-  useEffect(() => {
     let cancelled = false;
+
     setIsLoading(true);
 
-    getAllRoutes()
+    getDynamicRoute(point[0], point[1])
       .then((res) => {
-        if (!cancelled) setRoutes(res.data);
+        if (cancelled) return;
+
+        setRoute(res.data);
+        setError(res.error ?? null);
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load routes.");
-        }
+        if (cancelled) return;
+
+        setRoute(null);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to calculate safe route.",
+        );
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [point, onRouteChange]);
 
-  // Match the route to the actual location where the user clicked the street.
-  const bestRoute = useMemo(
-    () => selectBestRouteForPoint(point, routes),
-    [point, routes]
-  );
-
-  const activeRoute = dismissed ? null : bestRoute;
+  const activeRoute =
+    dismissed ? null : route;
 
   useEffect(() => {
     onRouteChange?.(activeRoute);
-    return () => onRouteChange?.(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoute]);
+
+    return () => {
+      onRouteChange?.(null);
+    };
+  }, [activeRoute, onRouteChange]);
 
   const isElevatedRisk =
     streetRisk &&
-    (streetRisk.risk === "MODERATE" || streetRisk.risk === "HIGH");
+    (
+      streetRisk.risk === "MODERATE" ||
+      streetRisk.risk === "HIGH"
+    );
 
   return (
-    <Panel title="Flood-Safe Route" icon={<Navigation size={13} />}>
+    <Panel
+      title="Flood-Safe Route"
+      icon={<Navigation size={13} />}
+    >
       {isLoading ? (
-        <InlineLoading label="Loading routes…" />
+        <InlineLoading label="Calculating safe route…" />
       ) : error ? (
         <InlineError message={error} />
       ) : !streetRisk ? (
         <p className="text-xs text-text-faint">
-          Click a street on the map to see a recommended safe route.
+          Click a street on the map to calculate a recommended safe route.
         </p>
-      ) : !bestRoute ? (
+      ) : !route ? (
         <p className="text-xs text-text-faint">
           Safe route unavailable for this area.
         </p>
@@ -115,16 +158,21 @@ export function RoutePanel({ streetRisk, point, onRouteChange }: RoutePanelProps
 
           {!dismissed && (
             <div className="rounded-md border border-hairline bg-panel-raised px-2.5 py-2 text-[11px] text-text-faint">
-              Nearest reference route:{" "}
-              <span className="text-text-primary">{bestRoute.label}</span> —{" "}
-              {bestRoute.safe.distanceKm.toFixed(2)} km,{" "}
-              {bestRoute.safe.durationMin} min.
+              Dynamic reference route:{" "}
+              <span className="text-text-primary">
+                {route.label}
+              </span>{" "}
+              —{" "}
+              {route.safe.distanceKm.toFixed(2)} km,{" "}
+              {route.safe.durationMin} min.
             </div>
           )}
         </div>
       ) : dismissed ? (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-text-faint">Route cleared.</p>
+          <p className="text-xs text-text-faint">
+            Route cleared.
+          </p>
 
           <button
             type="button"
@@ -138,35 +186,44 @@ export function RoutePanel({ streetRisk, point, onRouteChange }: RoutePanelProps
         <div className="space-y-3">
           <div
             className={`text-[11px] font-bold uppercase tracking-wide ${
-              isElevatedRisk ? "text-risk-high" : "text-text-faint"
+              isElevatedRisk
+                ? "text-risk-high"
+                : "text-text-faint"
             }`}
           >
-            {isElevatedRisk ? "Recommended safe exit" : "Flood-safe route"}
+            {isElevatedRisk
+              ? "Recommended safe exit"
+              : "Flood-safe route"}
           </div>
 
           <div className="text-xs text-text-primary font-medium">
-            {bestRoute.label}
+            {route.label}
           </div>
 
           <div className="flex gap-2">
             <RouteCard
-              option={bestRoute.fastest}
-              highlight={bestRoute.recommendation === "fastest"}
+              option={route.fastest}
+              highlight={
+                route.recommendation === "fastest"
+              }
             />
+
             <RouteCard
-              option={bestRoute.safe}
-              highlight={bestRoute.recommendation === "safe"}
+              option={route.safe}
+              highlight={
+                route.recommendation === "safe"
+              }
             />
           </div>
 
           <div
             className={`text-center text-[11px] font-semibold uppercase tracking-wide rounded-md py-1.5 ${
-              bestRoute.recommendation === "safe"
+              route.recommendation === "safe"
                 ? "bg-accent-soft text-accent"
                 : "bg-panel-raised text-text-muted"
             }`}
           >
-            {bestRoute.recommendation === "safe"
+            {route.recommendation === "safe"
               ? "Recommendation: Use safe route"
               : "Both routes carry similar risk"}
           </div>
@@ -181,11 +238,9 @@ export function RoutePanel({ streetRisk, point, onRouteChange }: RoutePanelProps
           </button>
 
           <p className="text-[10px] text-text-faint leading-relaxed">
-            Computed with real shortest-path routing on the actual Andheri road
-            graph, auto-matched to this street by geographic proximity
-            (scenario: {bestRoute.scenarioContext.replace(/_/g, " ")}). A fixed
-            set of demo route candidates — see README "Assumptions &amp; TODOs"
-            for the general-routing roadmap.
+            Calculated dynamically from the clicked street
+            on the real Andheri road graph using the current
+            flood-risk state.
           </p>
         </div>
       )}
