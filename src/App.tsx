@@ -71,7 +71,7 @@ export default function App() {
               selectedZoneId={floodData.selectedZoneId}
               onSelectZone={floodData.selectZone}
             />
-            <RoutePanel onRouteChange={setActiveRoute} />
+            <RoutePanel zone={floodData.selectedZone} onRouteChange={setActiveRoute} />
           </div>
         </aside>
       </div>

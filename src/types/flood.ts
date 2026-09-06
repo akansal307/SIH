@@ -57,7 +57,8 @@ export interface ZoneFeaturePropertiesWire {
   risk: RiskLevel;
   probability: number;
   class_probabilities: ZoneClassProbabilitiesWire;
-  depth_cm: number;
+  /** Null is an explicitly supported wire value — see FloodZone.depthCm below. */
+  depth_cm: number | null;
   onset_minutes: number | null;
   factors: ZoneFactorsWire;
   edge_count: number;
@@ -79,7 +80,7 @@ export interface AlertWire {
   zone_id: string;
   zone_name: string;
   severity: RiskLevel;
-  depth_cm: number;
+  depth_cm: number | null;
   onset_minutes: number | null;
   message: string;
   issued_at: string;
@@ -91,7 +92,7 @@ export interface FloodStateWire {
   label: string;
   rainfall_mm_hr: number;
   overall_risk: RiskLevel;
-  max_depth_cm: number;
+  max_depth_cm: number | null;
   affected_zones: number;
   earliest_onset_minutes: number | null;
   zones: ZonesFeatureCollectionWire;
@@ -188,7 +189,10 @@ export interface FloodZone {
   /** P(risk >= MODERATE), i.e. overall probability this zone floods at all. */
   probability: number;
   classProbabilities: ClassProbabilities;
-  depthCm: number;
+  /** Null means "not available" (e.g. a future backend response missing this field) —
+   * never coerced to a fallback number. Rendered via formatDepth(), which is the only
+   * place "Not Available" is decided. */
+  depthCm: number | null;
   onsetMinutes: number | null;
   factors: ZoneFactors;
   edgeCount: number;
@@ -200,7 +204,7 @@ export interface Alert {
   zoneId: string;
   zoneName: string;
   severity: RiskLevel;
-  depthCm: number;
+  depthCm: number | null;
   onsetMinutes: number | null;
   message: string;
   issuedAt: string;
@@ -212,7 +216,7 @@ export interface FloodState {
   label: string;
   rainfallMmHr: number;
   overallRisk: RiskLevel;
-  maxDepthCm: number;
+  maxDepthCm: number | null;
   affectedZones: number;
   earliestOnsetMinutes: number | null;
   zones: FloodZone[];

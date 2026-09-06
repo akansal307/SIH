@@ -82,7 +82,15 @@ export function formatMinutes(mins: number | null): string {
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
 }
 
-export function formatDepth(cm: number): string {
+/**
+ * Single source of truth for rendering a depth value anywhere in the UI. Always
+ * reflects whatever the active FloodState/FloodZone actually returned for the
+ * currently selected zone, offset, and mode — never a fixed fallback. If a future
+ * backend response omits depth (null/undefined), this is the one place that decides
+ * to show "Not Available" rather than inventing or defaulting to a number.
+ */
+export function formatDepth(cm: number | null | undefined): string {
+  if (cm === null || cm === undefined || Number.isNaN(cm)) return "Not Available";
   return `${cm.toFixed(0)} cm`;
 }
 

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import { Navigation, ShieldCheck, Zap, ChevronDown } from "lucide-react";
-import type { RouteOption, RouteRecommendation } from "../../types/flood";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Navigation, ShieldCheck, Zap, X } from "lucide-react";
+import type { FloodZone, RouteOption, RouteRecommendation } from "../../types/flood";
 import { Panel } from "../common/Panel";
 import { RiskBadge } from "../common/RiskBadge";
 import { InlineError, InlineLoading } from "../common/StateNotices";
 import { getAllRoutes } from "../../api/routeApi";
+import { selectBestRouteForZone } from "../../utils/routeSelection";
 
 function RouteCard({ option, highlight }: { option: RouteOption; highlight: boolean }) {
   const Icon = option.type === "fastest" ? Zap : ShieldCheck;
@@ -28,23 +29,36 @@ function RouteCard({ option, highlight }: { option: RouteOption; highlight: bool
 }
 
 interface RoutePanelProps {
+  /** The currently selected zone (same object useFloodData/App.tsx already derives
+   * for ZoneDetails) — the route recommendation is driven entirely by this, replacing
+   * the old manual dropdown. */
+  zone: FloodZone | null;
   onRouteChange?: (route: RouteRecommendation | null) => void;
 }
 
-export function RoutePanel({ onRouteChange }: RoutePanelProps) {
+export function RoutePanel({ zone, onRouteChange }: RoutePanelProps) {
   const [routes, setRoutes] = useState<RouteRecommendation[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Whether the user has manually dismissed the route for the CURRENT zone selection.
+  // Resets automatically whenever a different zone is selected (section 7: route
+  // must follow the selected zone, never linger from the previous one).
+  const [dismissed, setDismissed] = useState(false);
+  const lastZoneId = useRef<string | null>(null);
+  useEffect(() => {
+    if (zone?.id !== lastZoneId.current) {
+      lastZoneId.current = zone?.id ?? null;
+      setDismissed(false);
+    }
+  }, [zone?.id]);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     getAllRoutes()
       .then((res) => {
-        if (cancelled) return;
-        setRoutes(res.data);
-        setSelectedId(res.data[0]?.id ?? null);
+        if (!cancelled) setRoutes(res.data);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load routes.");
@@ -57,14 +71,19 @@ export function RoutePanel({ onRouteChange }: RoutePanelProps) {
     };
   }, []);
 
-  const selected = routes.find((r) => r.id === selectedId) ?? null;
+  // Only the geographic-match logic is new; every value shown (distance, duration,
+  // risk, geometry) still comes straight from the existing backend-provided route
+  // candidates in `routes` — nothing here fabricates a route.
+  const bestRoute = useMemo(() => selectBestRouteForZone(zone, routes), [zone, routes]);
+  const activeRoute = dismissed ? null : bestRoute;
 
   useEffect(() => {
-    onRouteChange?.(selected);
-    // Clear the map overlay on unmount (e.g. panel removed/re-mounted).
+    onRouteChange?.(activeRoute);
     return () => onRouteChange?.(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }, [activeRoute]);
+
+  const isElevatedRisk = zone && (zone.risk === "MODERATE" || zone.risk === "HIGH");
 
   return (
     <Panel title="Flood-Safe Route" icon={<Navigation size={13} />}>
@@ -72,44 +91,72 @@ export function RoutePanel({ onRouteChange }: RoutePanelProps) {
         <InlineLoading label="Loading routes…" />
       ) : error ? (
         <InlineError message={error} />
-      ) : !selected ? (
-        <p className="text-xs text-text-faint">No route examples available.</p>
+      ) : !zone ? (
+        <p className="text-xs text-text-faint">Click a flood-risk zone on the map to see a recommended safe route.</p>
+      ) : !bestRoute ? (
+        <p className="text-xs text-text-faint">Safe route unavailable for this area.</p>
+      ) : zone.risk === "LOW" ? (
+        <div className="space-y-2">
+          <p className="text-xs text-text-muted">Area currently low risk — no evacuation route recommended.</p>
+          {!dismissed && (
+            <div className="rounded-md border border-hairline bg-panel-raised px-2.5 py-2 text-[11px] text-text-faint">
+              Nearest reference route: <span className="text-text-primary">{bestRoute.label}</span> —{" "}
+              {bestRoute.safe.distanceKm.toFixed(2)} km, {bestRoute.safe.durationMin} min.
+            </div>
+          )}
+        </div>
+      ) : dismissed ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-text-faint">Route cleared.</p>
+          <button
+            type="button"
+            onClick={() => setDismissed(false)}
+            className="text-[11px] font-medium text-accent hover:underline shrink-0"
+          >
+            Show recommended route
+          </button>
+        </div>
       ) : (
         <div className="space-y-3">
-          <div className="relative">
-            <select
-              value={selected.id}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="w-full appearance-none bg-void border border-hairline rounded-md text-xs text-text-primary px-2.5 py-2 pr-7 cursor-pointer focus:outline-none focus:border-accent-dim"
-            >
-              {routes.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-faint pointer-events-none" />
+          <div
+            className={`text-[11px] font-bold uppercase tracking-wide ${
+              isElevatedRisk ? "text-risk-high" : "text-text-faint"
+            }`}
+          >
+            {isElevatedRisk ? "Recommended safe exit" : "Flood-safe route"}
           </div>
 
+          <div className="text-xs text-text-primary font-medium">{bestRoute.label}</div>
+
           <div className="flex gap-2">
-            <RouteCard option={selected.fastest} highlight={selected.recommendation === "fastest"} />
-            <RouteCard option={selected.safe} highlight={selected.recommendation === "safe"} />
+            <RouteCard option={bestRoute.fastest} highlight={bestRoute.recommendation === "fastest"} />
+            <RouteCard option={bestRoute.safe} highlight={bestRoute.recommendation === "safe"} />
           </div>
 
           <div
             className={`text-center text-[11px] font-semibold uppercase tracking-wide rounded-md py-1.5 ${
-              selected.recommendation === "safe"
+              bestRoute.recommendation === "safe"
                 ? "bg-accent-soft text-accent"
                 : "bg-panel-raised text-text-muted"
             }`}
           >
-            {selected.recommendation === "safe" ? "Recommendation: Use safe route" : "Both routes carry similar risk"}
+            {bestRoute.recommendation === "safe" ? "Recommendation: Use safe route" : "Both routes carry similar risk"}
           </div>
 
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-[11px] text-text-faint hover:text-text-primary transition-colors py-1"
+          >
+            <X size={11} />
+            Clear route
+          </button>
+
           <p className="text-[10px] text-text-faint leading-relaxed">
-            Computed with real shortest-path routing on the actual Andheri road graph
-            (scenario: {selected.scenarioContext.replace(/_/g, " ")}). A fixed set of demo
-            routes — see README "Assumptions &amp; TODOs" for the general-routing roadmap.
+            Computed with real shortest-path routing on the actual Andheri road graph, auto-matched to
+            this zone by geographic proximity (scenario: {bestRoute.scenarioContext.replace(/_/g, " ")}).
+            A fixed set of demo route candidates — see README "Assumptions &amp; TODOs" for the
+            general-routing roadmap.
           </p>
         </div>
       )}
