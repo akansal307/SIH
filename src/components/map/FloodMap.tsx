@@ -9,72 +9,39 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { FloodZone, RouteRecommendation } from "../../types/flood";
-import { ANDHERI_BOUNDS, ANDHERI_CENTER, zonesToFeatureCollection } from "../../utils/mapUtils";
+import type { RouteRecommendation } from "../../types/flood";
+import { ANDHERI_BOUNDS, ANDHERI_CENTER, joinStreetRisksToRoads } from "../../utils/mapUtils";
 import { RISK_COLORS } from "../../utils/riskUtils";
+import { getStreetRisks } from "../../api/floodApi";
 import { MapLegend } from "./MapLegend";
 
 interface FloodMapProps {
-  zones: FloodZone[];
-  selectedZoneId: string | null;
-  onSelectZone: (zoneId: string | null) => void;
+  selectedStreetId: string | null;
+  onSelectStreet: (edgeId: string | null, point?: [number, number] | null) => void;
   activeRoute: RouteRecommendation | null;
 }
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
-/**
- * The map is initialised with this minimal, zero-network-dependency style (a solid
- * background colour, no remote fetch) rather than a remote style JSON URL. This is a
- * deliberate reliability choice: the flood-risk layers (the actual point of this
- * screen) are added in the SAME 'load' handler as the style, so if the map's root
- * style ever depended on a flaky network fetch, a slow/blocked basemap request could
- * delay or entirely prevent 'load' from firing — silently blanking the whole map,
- * flood layers included. Using an inline style guarantees 'load' fires immediately,
- * so zones/roads/routes are always visible regardless of network conditions. The
- * OSM basemap (see OSM_RASTER_TILES below) is then layered in underneath as a
- * best-effort visual enhancement that cannot block or break the core map.
- */
 const BASE_STYLE: StyleSpecification = {
   version: 8,
   sources: {},
   layers: [{ id: "background", type: "background", paint: { "background-color": "#0a0f1a" } }],
 };
 
-/**
- * Free, keyless OpenStreetMap standard raster tiles. Switched from CARTO's
- * "keyless" dark_all endpoint after CARTO began serving "API KEY REQUIRED"
- * watermark tiles on every anonymous request (Aug 2026) — their free tier now
- * requires signup. OSM's own tile server remains free and keyless. Added as a plain
- * `raster` source (not a full remote style JSON) so a failed/blocked tile request
- * only leaves that one tile blank — it can never break the flood-risk visualization
- * on top, unlike loading a whole remote style as the map's root style would (see
- * BASE_STYLE above).
- *
- * Note: OSM's standard style is light-themed, not dark like CARTO's dark_all — if
- * you want a dark basemap back, sign up for a free CARTO or Mapbox API key instead.
- */
 const OSM_RASTER_TILES = [
   "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
   "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
   "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
 ];
 
-/**
- * Andheri flood-risk map (MapLibre GL JS). See README.md "Known Issues" —
- * maplibre-gl is pinned to 4.7.1 rather than the latest 6.x: 6.x's GeoJSON worker
- * failed to reach a loaded state in constrained/low-core-count environments during
- * testing (sources never rendered despite valid data), which 4.7.1 does not exhibit.
- * Revisit the pin once that's confirmed fixed upstream.
- */
-export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: FloodMapProps) {
+export function FloodMap({ selectedStreetId, onSelectStreet, activeRoute }: FloodMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
   const prevSelectedRef = useRef<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // --- Mount: create the map once ---
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -92,59 +59,18 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
     popupRef.current = new Popup({ closeButton: false, closeOnClick: false, maxWidth: "220px" });
 
     map.on("load", () => {
-      // Best-effort basemap. Deliberately added first and with no error handling
-      // beyond MapLibre's own per-tile fallback (blank tile) — its failure must never
-      // block the flood layers below from rendering.
       map.addSource("osm-basemap", { type: "raster", tiles: OSM_RASTER_TILES, tileSize: 256 });
       map.addLayer({ id: "osm-basemap-layer", type: "raster", source: "osm-basemap", paint: { "raster-opacity": 0.85 } });
 
-      // Real Andheri road network, derived from edge_cache.pkl (see
-      // scripts/build_zones.py) — context layer, not interactive.
       map.addSource("roads", {
         type: "geojson",
         data: `${import.meta.env.BASE_URL}data/andheri_roads.geojson`,
+        promoteId: "edge_id",
       });
       map.addLayer({
         id: "roads-line",
         type: "line",
         source: "roads",
-        paint: {
-          "line-color": "#3a4a63",
-          "line-opacity": 0.65,
-          "line-width": [
-            "match",
-            ["get", "highway"],
-            ["trunk", "primary", "motorway"],
-            2.2,
-            ["secondary", "tertiary"],
-            1.4,
-            0.6,
-          ],
-        },
-      });
-
-      map.addSource("zones", { type: "geojson", data: EMPTY_FC, promoteId: "zoneId" });
-      map.addLayer({
-        id: "zones-fill",
-        type: "fill",
-        source: "zones",
-        paint: {
-          "fill-color": [
-            "match",
-            ["get", "risk"],
-            "HIGH",
-            RISK_COLORS.HIGH,
-            "MODERATE",
-            RISK_COLORS.MODERATE,
-            RISK_COLORS.LOW,
-          ],
-          "fill-opacity": ["case", ["boolean", ["feature-state", "selected"], false], 0.62, 0.34],
-        },
-      });
-      map.addLayer({
-        id: "zones-outline",
-        type: "line",
-        source: "zones",
         paint: {
           "line-color": [
             "match",
@@ -155,8 +81,13 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
             RISK_COLORS.MODERATE,
             RISK_COLORS.LOW,
           ],
-          "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 3, 1],
-          "line-opacity": 0.9,
+          "line-opacity": ["case", ["boolean", ["feature-state", "selected"], false], 1, 0.8],
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "selected"], false],
+            5,
+            ["match", ["get", "highway"], ["trunk", "primary", "motorway"], 3, ["secondary", "tertiary"], 2, 1.4],
+          ],
         },
       });
 
@@ -182,28 +113,32 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
         paint: { "line-color": "#2fb8c6", "line-width": 4.5, "line-opacity": 0.95 },
       });
 
-      const handleZoneClick = (e: MapLayerMouseEvent) => {
+      const handleStreetClick = (e: MapLayerMouseEvent) => {
         const feature = e.features?.[0] as MapGeoJSONFeature | undefined;
-        if (feature?.properties) onSelectZone(String(feature.properties.zoneId));
+        if (feature?.properties) {
+          onSelectStreet(String(feature.properties.edge_id), [e.lngLat.lng, e.lngLat.lat]);
+        }
       };
       const handleMapClick = (e: MapLayerMouseEvent) => {
-        const hits = map.queryRenderedFeatures(e.point, { layers: ["zones-fill"] });
-        if (hits.length === 0) onSelectZone(null);
+        const hits = map.queryRenderedFeatures(e.point, { layers: ["roads-line"] });
+        if (hits.length === 0) onSelectStreet(null, null);
       };
       const handleMouseMove = (e: MapLayerMouseEvent) => {
         map.getCanvas().style.cursor = "pointer";
         const f = e.features?.[0];
         if (!f?.properties || !popupRef.current) return;
-        const { zoneName, risk, probability } = f.properties as {
-          zoneName: string;
+        const { name, highway, risk, probability } = f.properties as {
+          name: string;
+          highway: string;
           risk: string;
           probability: number;
         };
+        const label = name && name !== "NaN" ? name : highway;
         popupRef.current
           .setLngLat(e.lngLat)
           .setHTML(
             `<div style="font-family:var(--font-sans);min-width:150px">` +
-              `<div style="font-weight:600;font-size:12px;margin-bottom:2px">${zoneName}</div>` +
+              `<div style="font-weight:600;font-size:12px;margin-bottom:2px">${label}</div>` +
               `<div style="font-size:11px;color:${RISK_COLORS[risk as "LOW" | "MODERATE" | "HIGH"]}">${risk} · ${Math.round(
                 probability * 100
               )}% flood probability</div>` +
@@ -216,10 +151,10 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
         popupRef.current?.remove();
       };
 
-      map.on("click", "zones-fill", handleZoneClick);
+      map.on("click", "roads-line", handleStreetClick);
       map.on("click", handleMapClick);
-      map.on("mousemove", "zones-fill", handleMouseMove);
-      map.on("mouseleave", "zones-fill", handleMouseLeave);
+      map.on("mousemove", "roads-line", handleMouseMove);
+      map.on("mouseleave", "roads-line", handleMouseLeave);
 
       setIsMapReady(true);
     });
@@ -233,29 +168,41 @@ export function FloodMap({ zones, selectedZoneId, onSelectZone, activeRoute }: F
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Keep the zones source in sync with live/simulation/forecast data ---
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
-    const source = mapRef.current.getSource("zones");
-    if (source && "setData" in source) {
-      (source as GeoJSONSource).setData(zonesToFeatureCollection(zones));
-    }
-  }, [isMapReady, zones]);
+    const map = mapRef.current;
 
-  // --- Selected-zone highlight via feature-state ---
+    let cancelled = false;
+    (async () => {
+      const [roadsRes, risksRes] = await Promise.all([
+        fetch(`${import.meta.env.BASE_URL}data/andheri_roads.geojson`).then((r) => r.json()),
+        getStreetRisks(),
+      ]);
+      if (cancelled) return;
+      const joined = joinStreetRisksToRoads(roadsRes, risksRes.data);
+      const source = map.getSource("roads");
+      if (source && "setData" in source) {
+        (source as GeoJSONSource).setData(joined);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isMapReady]);
+
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
     const map = mapRef.current;
     if (prevSelectedRef.current) {
-      map.setFeatureState({ source: "zones", id: prevSelectedRef.current }, { selected: false });
+      map.setFeatureState({ source: "roads", id: prevSelectedRef.current }, { selected: false });
     }
-    if (selectedZoneId) {
-      map.setFeatureState({ source: "zones", id: selectedZoneId }, { selected: true });
+    if (selectedStreetId) {
+      map.setFeatureState({ source: "roads", id: selectedStreetId }, { selected: true });
     }
-    prevSelectedRef.current = selectedZoneId;
-  }, [isMapReady, selectedZoneId]);
+    prevSelectedRef.current = selectedStreetId;
+  }, [isMapReady, selectedStreetId]);
 
-  // --- Route overlay ---
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
     const map = mapRef.current;
