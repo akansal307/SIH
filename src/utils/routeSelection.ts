@@ -99,3 +99,24 @@ export function selectBestRouteForZone(
 
   return scored[0]?.route ?? null;
 }
+export function selectBestRouteForPoint(
+  point: [number, number] | null,
+  routes: RouteRecommendation[],
+): RouteRecommendation | null {
+  if (!point || routes.length === 0) return null;
+
+  const scored = routes
+    .map((route) => ({ route, distance: distanceToRoute(point, route) }))
+    .filter((s) => s.distance <= MAX_RELEVANT_DISTANCE_KM)
+    .sort((a, b) => {
+      if (Math.abs(a.distance - b.distance) > CLOSE_ENOUGH_KM) {
+        return a.distance - b.distance;
+      }
+      const riskDiff =
+        RISK_RANK[a.route.safe.risk] - RISK_RANK[b.route.safe.risk];
+      if (riskDiff !== 0) return riskDiff;
+      return a.route.safe.distanceKm - b.route.safe.distanceKm;
+    });
+
+  return scored[0]?.route ?? null;
+}
