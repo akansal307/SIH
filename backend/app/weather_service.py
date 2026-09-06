@@ -1,19 +1,37 @@
 """
+
 weather_service.py
 
-The "Fetch Live Weather/Data" piece: pulls real rainfall data for Andheri from
-Open-Meteo (https://open-meteo.com — free, no API key required, used here for its
-minutely/hourly precipitation forecast+observation blend) and turns it into the three
-dynamic rain features the model needs (rain_total_mm, rain_max_hourly_mm,
-rain_peak_3hr_mm), plus a forecast for the next 3 hours at the same offsets the
+The "Fetch Live Weather/Data" piece: pulls real rainfall data for Andheri and turns
+it into the three dynamic rain features the model needs (rain_total_mm,
+rain_max_hourly_mm, rain_peak_3hr_mm), plus a forecast at the same offsets the
 frontend expects (0/30/60/120/180 min).
 
+Rainfall source is resolved in order, never raises:
+  1. Tomorrow.io (https://www.tomorrow.io), if TOMORROWIO_API_KEY is set — a native
+     regional model, 1-hour resolution, past 3h + forecast 4h via the Timelines API.
+  2. Open-Meteo (https://open-meteo.com), free and keyless — 15-minute resolution via
+     `minutely_15`, interpolated from the hourly model for India (not a native
+     high-res model, since that's only available for North America/Central Europe).
+     Used automatically if no Tomorrow.io key is set, or if the Tomorrow.io call
+     fails for any reason.
+  3. A documented fallback constant (FALLBACK_RAIN), if both of the above fail.
+The actual source used for a given fetch is always reported back via `rain_source`
+("tomorrow.io" / "open-meteo" / "fallback") — see fetch_live_rain() and
+fetch_live_conditions().
+
 Tide: we don't have a free, keyless, reliable Indian tide-gauge API. If
-WORLDTIDES_API_KEY is set (https://www.worldtides.info), we use it. Otherwise we fall
-back to a documented constant, exactly like scripts/generate_scenarios.py's
-LIVE_BASELINE already does — this is a real, flagged assumption, not a silent guess.
-See `source` on the returned dict.
+WORLDTIDES_API_KEY is set (https://www.worldtides.info), we fetch real tide extremes
+over a 24-hour window (wide enough to reliably include at least one real High tide —
+a shorter window frequently contained none, which made a genuine-but-empty response
+indistinguishable from failure). Tide refreshes on its own, much slower poll loop
+than rainfall (see main.py's _tide_poll_loop), since WorldTides' free tier has a tight
+monthly call quota and tides don't meaningfully change on a 5-minute timescale.
+Otherwise we fall back to a documented constant, exactly like
+scripts/generate_scenarios.py's LIVE_BASELINE already does — this is a real, flagged
+assumption, not a silent guess. See `tide_source` on the returned dict.
 """
+
 
 from __future__ import annotations
 
@@ -28,6 +46,7 @@ from . import config
 logger = logging.getLogger("flood_backend.weather_service")
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+TOMORROWIO_URL = "https://api.tomorrow.io/v4/timelines"
 WORLDTIDES_URL = "https://www.worldtides.info/api/v3"
 
 # Documented fallback used only if the live rainfall API call fails (network outage,
@@ -52,14 +71,18 @@ class LiveConditions:
 
 
 async def _fetch_open_meteo(client: httpx.AsyncClient) -> dict | None:
-    """Returns {offset_min: hourly_mm} for the past hour (accumulation context) and
-    the next 3 hours, keyed by minute-offset-from-now, or None on any failure."""
+    """Requests 15-minute-resolution precipitation instead of hourly. For Andheri
+    (outside Open-Meteo's native North America/Central Europe high-res coverage) this
+    is interpolated from the same underlying hourly model — so it's a smoothed curve,
+    not independent finer-grained observations — but it still gives a genuinely
+    different value every 15 minutes instead of a flat step that only changes once an
+    hour, which is what NOW/+30min/+60min/etc. need to look meaningfully distinct."""
     params = {
         "latitude": config.ANDHERI_LAT,
         "longitude": config.ANDHERI_LON,
-        "hourly": "precipitation",
-        "past_hours": 3,
-        "forecast_hours": 4,
+        "minutely_15": "precipitation",
+        "past_minutely_15": 12,      # 3 hours of history, in 15-min steps
+        "forecast_minutely_15": 16,  # 4 hours ahead, in 15-min steps
         "timezone": "UTC",
     }
     resp = await client.get(OPEN_METEO_URL, params=params, timeout=10.0)
@@ -67,22 +90,30 @@ async def _fetch_open_meteo(client: httpx.AsyncClient) -> dict | None:
     return resp.json()
 
 
-def _rain_features_from_hourly(times: list[str], precip_mm: list[float], now: datetime, offset_min: int):
-    """Turns Open-Meteo's per-hour precipitation series into the model's three dynamic
-    rain features at `now + offset_min`:
-      - rain_total_mm: accumulated precipitation over the trailing 3 hours up to that
-        point (real observed/forecast hourly values, linearly apportioned within the
-        current hour rather than a nowcast model).
-      - rain_max_hourly_mm: the precipitation rate for the hour containing that point.
-      - rain_peak_3hr_mm: same as rain_total_mm here, since the window is exactly 3h
-        (matches the convention scripts/generate_scenarios.py uses).
-    This is real API data, not a synthetic scenario — the only approximation is
-    apportioning a hodograph within-hour, which Open-Meteo doesn't sub-divide."""
-    target = now.replace(minute=0, second=0, microsecond=0) + \
-        timedelta(minutes=offset_min + now.minute)
-    parsed_times = [datetime.fromisoformat(t).replace(tzinfo=timezone.utc) for t in times]
+BUCKET_MINUTES = 15
+BUCKETS_PER_HOUR = 60 // BUCKET_MINUTES     # 4
+BUCKETS_PER_3HR = 180 // BUCKET_MINUTES     # 12
 
-    # Find the hourly bucket containing `target`.
+
+def _rain_features_from_series(times: list[str], precip_mm: list[float], now: datetime,
+                                offset_min: int, bucket_minutes: int = BUCKET_MINUTES):
+    """Turns a per-bucket precipitation series (bucket width = bucket_minutes) into the
+    model's three dynamic rain features at `now + offset_min`:
+      - rain_max_hourly_mm: the trailing 1-hour sum ending at that point — computed
+        from however many buckets make up an hour at this source's resolution, so it
+        actually changes at every bucket step instead of only once an hour.
+      - rain_total_mm: the trailing 3-hour sum ending at that point.
+      - rain_peak_3hr_mm: the highest 3-hour trailing sum found anywhere in the
+        available series up to that point — a real rolling-max, not a copy of
+        rain_total_mm. Stays elevated if a real spike happened earlier even after
+        rain has since tapered off.
+    """
+    buckets_per_hour = max(1, 60 // bucket_minutes)
+    buckets_per_3hr = max(1, 180 // bucket_minutes)
+
+    target = now + timedelta(minutes=offset_min)
+    parsed_times = [datetime.fromisoformat(t.replace("Z", "+00:00")).astimezone(timezone.utc) for t in times]
+
     idx = 0
     for i, t in enumerate(parsed_times):
         if t <= target:
@@ -90,13 +121,58 @@ def _rain_features_from_hourly(times: list[str], precip_mm: list[float], now: da
         else:
             break
 
-    hourly_now = float(precip_mm[idx]) if idx < len(precip_mm) else 0.0
-    window = precip_mm[max(0, idx - 2): idx + 1]
-    total_3hr = float(sum(window)) if window else 0.0
-    return round(total_3hr, 2), round(hourly_now, 2), round(total_3hr, 2)
+    hourly_window = precip_mm[max(0, idx - (buckets_per_hour - 1)): idx + 1]
+    hourly_now = float(sum(hourly_window)) if hourly_window else 0.0
+
+    trailing_window = precip_mm[max(0, idx - (buckets_per_3hr - 1)): idx + 1]
+    total_3hr = float(sum(trailing_window)) if trailing_window else 0.0
+
+    peak_3hr = 0.0
+    for end in range(0, idx + 1):
+        w = precip_mm[max(0, end - (buckets_per_3hr - 1)): end + 1]
+        peak_3hr = max(peak_3hr, sum(w))
+
+    return round(total_3hr, 2), round(hourly_now, 2), round(float(peak_3hr), 2)
+
+
+async def _fetch_tomorrowio(client: httpx.AsyncClient) -> dict | None:
+    """Tomorrow.io's Timelines API — 1-hour resolution, past 3h + forecast 4h, using
+    a native regional model rather than Open-Meteo's hourly-interpolated minutely_15
+    for India. Returns the raw parsed JSON, or raises on failure (caller handles
+    fallback). Free tier: ~100 requests/day — fine at a 5-minute poll interval
+    (~288/day) only if you raise WEATHER_POLL_INTERVAL_SECONDS; see README."""
+    now = datetime.now(timezone.utc)
+    body = {
+        "location": f"{config.ANDHERI_LAT},{config.ANDHERI_LON}",
+        "fields": ["precipitationIntensity"],
+        "timesteps": ["1h"],
+        "startTime": (now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:00:00Z"),
+        "endTime": (now + timedelta(hours=4)).strftime("%Y-%m-%dT%H:00:00Z"),
+        "units": "metric",
+    }
+    resp = await client.post(
+        TOMORROWIO_URL, params={"apikey": config.TOMORROWIO_API_KEY}, json=body, timeout=10.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    intervals = data["data"]["timelines"][0]["intervals"]
+    times = [iv["startTime"] for iv in intervals]
+    # precipitationIntensity is mm/hr; at a 1-hour bucket width, rate * 1h = mm for
+    # that bucket, so it's directly usable as an hourly accumulated-mm series, same
+    # shape as Open-Meteo's "precipitation" field.
+    precip = [float(iv["values"]["precipitationIntensity"]) for iv in intervals]
+    return times, precip
 
 
 async def _fetch_worldtides(client: httpx.AsyncClient) -> dict | None:
+    """Fetches tide extremes for the next 24 hours (not just 3) so the window reliably
+    contains at least one real High tide — tides cycle roughly every ~12.4 hours, so a
+    3-hour window frequently contains zero Highs (or nothing at all), which made
+    correctly-fetched-but-empty results look identical to the fallback constant. Takes
+    the highest High-tide height in that 24h window as max_tide_height_m, and counts
+    Highs for num_high_tides — matching the semantics scripts/generate_scenarios.py's
+    presets use (a "how much high-tide pressure is there today" signal), rather than
+    an arbitrary short lookout window."""
     if not config.WORLDTIDES_API_KEY:
         return None
     params = {
@@ -114,6 +190,10 @@ async def _fetch_worldtides(client: httpx.AsyncClient) -> dict | None:
     if highs:
         max_height = max(float(e["height"]) for e in highs)
     elif extremes:
+        # No High in range (shouldn't happen with a 24h window, but guard anyway) —
+        # fall back to the highest extreme of any type rather than silently using
+        # the module-level fallback constant, so a real-but-unusual response is still
+        # reflected instead of masked.
         max_height = max(float(e["height"]) for e in extremes)
     else:
         max_height = FALLBACK_TIDE["max_tide_height_m"]
@@ -122,6 +202,9 @@ async def _fetch_worldtides(client: httpx.AsyncClient) -> dict | None:
 
 async def fetch_live_rain() -> tuple[dict, dict[int, dict], str]:
     """Rain-only fetch — called on the fast poll loop (WEATHER_POLL_INTERVAL_SECONDS).
+    Prefers Tomorrow.io (1-hour resolution, native regional model) if
+    TOMORROWIO_API_KEY is set; otherwise uses Open-Meteo (15-minute resolution,
+    interpolated for India). Falls back to the documented constant if both fail.
     Returns (rain_now, rain_forecast_by_offset, rain_source). Never raises."""
     now = datetime.now(timezone.utc)
     rain_now = dict(FALLBACK_RAIN)
@@ -129,23 +212,38 @@ async def fetch_live_rain() -> tuple[dict, dict[int, dict], str]:
     rain_source = "fallback"
 
     async with httpx.AsyncClient() as client:
-        try:
-            payload = await _fetch_open_meteo(client)
-            hourly = payload["hourly"]
-            times, precip = hourly["time"], hourly["precipitation"]
+        times, precip, bucket_minutes, source_name = None, None, BUCKET_MINUTES, None
+
+        if config.TOMORROWIO_API_KEY:
+            try:
+                times, precip = await _fetch_tomorrowio(client)
+                bucket_minutes, source_name = 60, "tomorrow.io"
+            except Exception:
+                logger.exception(
+                    "Live rainfall fetch (Tomorrow.io) failed — falling back to Open-Meteo."
+                )
+
+        if times is None:
+            try:
+                payload = await _fetch_open_meteo(client)
+                block = payload["minutely_15"]
+                times, precip = block["time"], block["precipitation"]
+                bucket_minutes, source_name = BUCKET_MINUTES, "open-meteo"
+            except Exception:
+                logger.exception(
+                    "Live rainfall fetch (Open-Meteo) failed — falling back to the "
+                    "documented baseline rainfall values used by scripts/generate_scenarios.py. "
+                    "This is surfaced to clients via rain_source='fallback'."
+                )
+
+        if times is not None:
             for off in config.FORECAST_OFFSETS_MIN:
-                total, hr, peak3 = _rain_features_from_hourly(times, precip, now, off)
+                total, hr, peak3 = _rain_features_from_series(times, precip, now, off, bucket_minutes)
                 snap = {"rain_total_mm": total, "rain_max_hourly_mm": hr, "rain_peak_3hr_mm": peak3}
                 rain_forecast[off] = snap
                 if off == 0:
                     rain_now = snap
-            rain_source = "open-meteo"
-        except Exception:
-            logger.exception(
-                "Live rainfall fetch (Open-Meteo) failed — falling back to the "
-                "documented baseline rainfall values used by scripts/generate_scenarios.py. "
-                "This is surfaced to clients via rain_source='fallback'."
-            )
+            rain_source = source_name
 
     return rain_now, rain_forecast, rain_source
 
