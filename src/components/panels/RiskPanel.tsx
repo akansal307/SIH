@@ -1,9 +1,9 @@
-import { Gauge, CloudRain, Waves, MapPinned, Clock } from "lucide-react";
+import { Gauge, CloudRain, MapPinned, Clock } from "lucide-react";
 import type { FloodState } from "../../types/flood";
 import { Panel } from "../common/Panel";
 import { RiskBadge } from "../common/RiskBadge";
 import { InlineLoading } from "../common/StateNotices";
-import { formatDepth, formatMinutes } from "../../utils/riskUtils";
+import { formatMinutes } from "../../utils/riskUtils";
 
 interface RiskPanelProps {
   state: FloodState | null;
@@ -36,7 +36,6 @@ export function RiskPanel({ state, isLoading }: RiskPanelProps) {
             <RiskBadge risk={state.overallRisk} size="md" />
           </div>
           <Stat icon={<CloudRain size={13} />} label="Rainfall" value={`${state.rainfallMmHr.toFixed(1)} mm/hr`} />
-          <Stat icon={<Waves size={13} />} label="Max predicted depth" value={formatDepth(state.maxDepthCm)} />
           <Stat icon={<MapPinned size={13} />} label="Affected zones" value={`${state.affectedZones} / 33`} />
           <Stat
             icon={<Clock size={13} />}
