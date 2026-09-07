@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigation, ShieldCheck, Zap, X } from "lucide-react";
+
 import type {
   RouteOption,
   RouteRecommendation,
@@ -71,13 +72,30 @@ export function RoutePanel({
   const [dismissed, setDismissed] =
     useState(false);
 
+  /*
+   * Only calculate a route for MODERATE or HIGH streets.
+   * LOW-risk streets do not require rerouting.
+   */
+  const needsRerouting =
+    streetRisk?.risk === "MODERATE" ||
+    streetRisk?.risk === "HIGH";
+
+  /*
+   * A HIGH-risk street is treated as requiring evacuation.
+   */
+  const needsEvacuation =
+    streetRisk?.risk === "HIGH";
+
   useEffect(() => {
     setDismissed(false);
     setError(null);
     setRoute(null);
 
-    // No clicked street = no dynamic route.
-    if (!point) {
+    /*
+     * Nothing selected OR LOW-risk street:
+     * clear any previous route and do not call the backend.
+     */
+    if (!point || !needsRerouting) {
       setIsLoading(false);
       onRouteChange?.(null);
       return;
@@ -98,6 +116,7 @@ export function RoutePanel({
         if (cancelled) return;
 
         setRoute(null);
+
         setError(
           err instanceof Error
             ? err.message
@@ -113,58 +132,81 @@ export function RoutePanel({
     return () => {
       cancelled = true;
     };
-  }, [point, onRouteChange]);
+  }, [point, needsRerouting, onRouteChange]);
 
   const activeRoute =
     dismissed ? null : route;
 
   useEffect(() => {
-  onRouteChange?.(activeRoute);
-}, [activeRoute, onRouteChange]);
-
-  const isElevatedRisk =
-    streetRisk &&
-    (
-      streetRisk.risk === "MODERATE" ||
-      streetRisk.risk === "HIGH"
-    );
+    onRouteChange?.(activeRoute);
+  }, [activeRoute, onRouteChange]);
 
   return (
     <Panel
       title="Flood-Safe Route"
       icon={<Navigation size={13} />}
     >
-      {isLoading ? (
+      {!streetRisk ? (
+        <p className="text-xs text-text-faint">
+          Click a street on the map to view its flood status.
+        </p>
+      ) : streetRisk.risk === "LOW" ? (
+        /*
+         * GREEN STREET
+         */
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-accent">
+              No rerouting required
+            </div>
+
+            <RiskBadge
+              risk="LOW"
+              size="sm"
+            />
+          </div>
+
+          <p className="text-xs text-text-muted">
+            This street is currently low risk.
+            Normal travel can continue.
+          </p>
+
+          <div className="rounded-md border border-hairline bg-panel-raised px-2.5 py-2 text-[11px] text-text-faint">
+            No evacuation route is required for this street.
+          </div>
+        </div>
+      ) : isLoading ? (
+        /*
+         * MODERATE / HIGH WHILE ROUTE IS CALCULATING
+         */
         <InlineLoading label="Calculating safe route…" />
       ) : error ? (
         <InlineError message={error} />
-      ) : !streetRisk ? (
-        <p className="text-xs text-text-faint">
-          Click a street on the map to calculate a recommended safe route.
-        </p>
       ) : !route ? (
-        <p className="text-xs text-text-faint">
-          Safe route unavailable for this area.
-        </p>
-      ) : streetRisk.risk === "LOW" ? (
+        /*
+         * MODERATE / HIGH BUT NO ROUTE AVAILABLE
+         */
         <div className="space-y-2">
+          <div className="text-[11px] font-bold uppercase tracking-wide text-risk-high">
+            {needsEvacuation
+              ? "Evacuation required"
+              : "Rerouting recommended"}
+          </div>
+
           <p className="text-xs text-text-muted">
-            Area currently low risk — no evacuation route recommended.
+            {needsEvacuation
+              ? "This street has high flood risk. Evacuation is recommended."
+              : "This street has elevated flood risk. Use an alternate route."}
           </p>
 
-          {!dismissed && (
-            <div className="rounded-md border border-hairline bg-panel-raised px-2.5 py-2 text-[11px] text-text-faint">
-              Dynamic reference route:{" "}
-              <span className="text-text-primary">
-                {route.label}
-              </span>{" "}
-              —{" "}
-              {route.safe.distanceKm.toFixed(2)} km,{" "}
-              {route.safe.durationMin} min.
-            </div>
-          )}
+          <p className="text-[10px] text-text-faint">
+            A safe route could not be calculated from this location.
+          </p>
         </div>
       ) : dismissed ? (
+        /*
+         * ROUTE DISMISSED
+         */
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-text-faint">
             Route cleared.
@@ -175,25 +217,40 @@ export function RoutePanel({
             onClick={() => setDismissed(false)}
             className="text-[11px] font-medium text-accent hover:underline shrink-0"
           >
-            Show recommended route
+            Show route
           </button>
         </div>
       ) : (
+        /*
+         * MODERATE / HIGH WITH ROUTE
+         */
         <div className="space-y-3">
           <div
             className={`text-[11px] font-bold uppercase tracking-wide ${
-              isElevatedRisk
+              needsEvacuation
                 ? "text-risk-high"
-                : "text-text-faint"
+                : "text-text-muted"
             }`}
           >
-            {isElevatedRisk
-              ? "Recommended safe exit"
-              : "Flood-safe route"}
+            {needsEvacuation
+              ? "Evacuation required"
+              : "Rerouting recommended"}
           </div>
 
           <div className="text-xs text-text-primary font-medium">
             {route.label}
+          </div>
+
+          <div className="rounded-md border border-hairline bg-panel-raised px-2.5 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-text-faint">
+              Action
+            </div>
+
+            <div className="text-xs text-text-primary mt-0.5">
+              {needsEvacuation
+                ? "Leave the high-risk street and follow the flood-safe route."
+                : "Avoid the affected street and use the safer route."}
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -220,8 +277,8 @@ export function RoutePanel({
             }`}
           >
             {route.recommendation === "safe"
-              ? "Recommendation: Use safe route"
-              : "Both routes carry similar risk"}
+              ? "Recommendation: Use flood-safe route"
+              : "Fastest and safe routes have similar risk"}
           </div>
 
           <button
@@ -234,9 +291,8 @@ export function RoutePanel({
           </button>
 
           <p className="text-[10px] text-text-faint leading-relaxed">
-            Calculated dynamically from the clicked street
-            on the real Andheri road graph using the current
-            flood-risk state.
+            Route calculated dynamically from the clicked street
+            on the real Andheri road graph using current flood-risk data.
           </p>
         </div>
       )}
