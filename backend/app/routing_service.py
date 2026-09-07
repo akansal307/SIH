@@ -4,13 +4,18 @@ routing_service.py
 Loads the real Andheri road graph once at startup.
 
 Supports:
-  - Fixed demo origin/destination routes via compute_route()
+  - Existing fixed demo routes via compute_route()
   - Dynamic street-click routing via compute_dynamic_route()
 
-Dynamic routing starts from the road node nearest the clicked street and
-chooses the best of the existing configured destinations. Current per-street
-flood risk is used when a graph edge can be matched by edge_id; zone risk
-remains as a fallback.
+Dynamic routing:
+  - starts at the graph node nearest the clicked map position
+  - uses current per-street flood risk when available
+  - falls back to current flood-zone risk
+  - chooses among the existing configured destinations
+  - uses Dijkstra on the real road graph
+
+The expensive flood-penalised graph is built once per live refresh cycle
+and reused by dynamic route requests.
 """
 
 from __future__ import annotations
@@ -25,24 +30,35 @@ from . import config
 logger = logging.getLogger("flood_backend.routing_service")
 
 
+# --------------------------------------------------------------------------- #
+# Graph loading
+# --------------------------------------------------------------------------- #
+
 def load_graph() -> nx.Graph:
     logger.info("Loading road graph: %s", config.GRAPHML_PATH)
 
     G = nx.read_graphml(config.GRAPHML_PATH)
 
-    for _, _, data in G.edges(data=True):
+    for _, _, _, data in G.edges(keys=True, data=True):
         data["length"] = float(data.get("length", 1.0))
 
-    # MVP simplification: treat graph as undirected.
+    # MVP simplification: treat the network as undirected.
     return G.to_undirected()
 
 
+# --------------------------------------------------------------------------- #
+# Basic helpers
+# --------------------------------------------------------------------------- #
+
 def _norm_scalar(v):
-    return v[0] if isinstance(v, list) and v else (None if isinstance(v, list) else v)
+    if isinstance(v, list):
+        return v[0] if v else None
+    return v
 
 
 def _nearest_node(G: nx.Graph, lon: float, lat: float):
-    best, best_d2 = None, float("inf")
+    best = None
+    best_d2 = float("inf")
 
     for n, data in G.nodes(data=True):
         try:
@@ -54,7 +70,8 @@ def _nearest_node(G: nx.Graph, lon: float, lat: float):
         d2 = (x - lon) ** 2 + (y - lat) ** 2
 
         if d2 < best_d2:
-            best, best_d2 = n, d2
+            best = n
+            best_d2 = d2
 
     return best
 
@@ -73,8 +90,12 @@ def _path_to_coords(G: nx.Graph, path_nodes: list) -> list:
     ]
 
 
-def _path_metrics(G: nx.Graph, path_nodes: list) -> tuple[float, float]:
-    length_m, time_hr = 0.0, 0.0
+def _path_metrics(
+    G: nx.Graph,
+    path_nodes: list,
+) -> tuple[float, float]:
+    length_m = 0.0
+    time_hr = 0.0
 
     for u, v in zip(path_nodes[:-1], path_nodes[1:]):
         edge_data = G.get_edge_data(u, v)
@@ -82,23 +103,27 @@ def _path_metrics(G: nx.Graph, path_nodes: list) -> tuple[float, float]:
         if not edge_data:
             continue
 
-        edata = min(
+        data = min(
             edge_data.values(),
             key=lambda d: d.get("length", 1e9),
         )
 
-        seg_len = float(edata.get("length", 0.0))
+        seg_len = float(data.get("length", 0.0))
 
         length_m += seg_len
 
         time_hr += (
             seg_len
             / 1000.0
-            / _edge_speed_kmh(edata.get("highway"))
+            / _edge_speed_kmh(data.get("highway"))
         )
 
     return length_m, time_hr
 
+
+# --------------------------------------------------------------------------- #
+# Flood-zone helpers
+# --------------------------------------------------------------------------- #
 
 def _zone_lookup_fn(zones_geojson: dict):
     entries = [
@@ -130,27 +155,13 @@ def _risk_rank(risk: str) -> int:
     }.get(risk, 0)
 
 
-def _edge_id_from_data(data: dict) -> str | None:
-    """
-    Try the common graph attribute names used for road identity.
-    """
-    for key in ("edge_id", "id"):
-        value = data.get(key)
-
-        if value is None:
-            continue
-
-        value = _norm_scalar(value)
-
-        if value is not None:
-            return str(value)
-
-    return None
-
+# --------------------------------------------------------------------------- #
+# Street-risk helpers
+# --------------------------------------------------------------------------- #
 
 def _street_risk_lookup(street_risks: list[dict]):
     by_edge_id = {
-        str(item.get("edge_id")): item
+        str(item["edge_id"]): str(item.get("risk", "LOW"))
         for item in street_risks
         if item.get("edge_id") is not None
     }
@@ -158,27 +169,82 @@ def _street_risk_lookup(street_risks: list[dict]):
     def lookup(edge_id: str | None):
         if not edge_id:
             return None
-
-        item = by_edge_id.get(str(edge_id))
-
-        if not item:
-            return None
-
-        return str(item.get("risk", "LOW"))
+        return by_edge_id.get(str(edge_id))
 
     return lookup
 
 
-def _build_penalised_graph(
+def _candidate_edge_ids(u, v, key) -> list[str]:
+    """
+    GraphML edge IDs correspond to node_u_node_v_key.
+
+    Because the graph is converted to an undirected MultiGraph, accept
+    both directions when matching the street-risk edge ID.
+    """
+    return [
+        f"{u}_{v}_{key}",
+        f"{v}_{u}_{key}",
+    ]
+
+
+def _edge_risk(
+    street_lookup,
+    u,
+    v,
+    key,
+    data: dict,
+):
+    for edge_id in _candidate_edge_ids(u, v, key):
+        risk = street_lookup(edge_id)
+        if risk is not None:
+            return risk
+
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# Destination preparation
+# --------------------------------------------------------------------------- #
+
+def precompute_destination_nodes(
+    G: nx.Graph,
+) -> dict[str, object]:
+    """
+    Resolve each configured destination to its nearest road-graph node once.
+    """
+    destination_nodes: dict[str, object] = {}
+
+    for route_id, od in config.ROUTE_OD_PAIRS.items():
+        node = _nearest_node(
+            G,
+            *od["destination"],
+        )
+
+        if node is not None:
+            destination_nodes[route_id] = node
+
+    logger.info(
+        "Precomputed %d configured destination nodes.",
+        len(destination_nodes),
+    )
+
+    return destination_nodes
+
+
+# --------------------------------------------------------------------------- #
+# Penalised routing graph
+# --------------------------------------------------------------------------- #
+
+def build_penalised_graph(
     G: nx.Graph,
     zones_geojson: dict,
     street_risks: list[dict],
 ) -> nx.Graph:
     """
-    Build a routing graph where flooded streets are strongly penalised.
+    Build a graph whose edge weights are increased for flooded streets.
 
     Priority:
-      1. Exact edge_id street risk
+      1. Exact per-street risk using edge_id
       2. Flood-zone risk at edge midpoint
     """
     zone_lookup = _zone_lookup_fn(zones_geojson)
@@ -186,19 +252,18 @@ def _build_penalised_graph(
 
     G_penalised = G.copy()
 
-    for u, v, data in G_penalised.edges(data=True):
-        original_data = G.get_edge_data(u, v)
-
-        if not original_data:
-            risk = "LOW"
-        else:
-            base_edge = min(
-                original_data.values(),
-                key=lambda d: d.get("length", 1e9),
+    if G_penalised.is_multigraph():
+        for u, v, key, data in G_penalised.edges(
+            keys=True,
+            data=True,
+        ):
+            risk = _edge_risk(
+                street_lookup,
+                u,
+                v,
+                key,
+                data,
             )
-
-            edge_id = _edge_id_from_data(base_edge)
-            risk = street_lookup(edge_id)
 
             if risk is None:
                 ux = float(G.nodes[u]["x"])
@@ -211,17 +276,46 @@ def _build_penalised_graph(
                     (uy + vy) / 2,
                 )
 
-        multiplier = config.RISK_PENALTY_MULTIPLIER.get(
-            risk,
-            config.RISK_PENALTY_MULTIPLIER["LOW"],
-        )
+            multiplier = config.RISK_PENALTY_MULTIPLIER.get(
+                risk,
+                config.RISK_PENALTY_MULTIPLIER["LOW"],
+            )
 
-        data["penalised_length"] = (
-            float(data.get("length", 1.0)) * multiplier
-        )
+            data["penalised_length"] = (
+                float(data.get("length", 1.0))
+                * multiplier
+            )
+    else:
+        for u, v, data in G_penalised.edges(data=True):
+            risk = None
+
+            if risk is None:
+                ux = float(G.nodes[u]["x"])
+                uy = float(G.nodes[u]["y"])
+                vx = float(G.nodes[v]["x"])
+                vy = float(G.nodes[v]["y"])
+
+                _, risk = zone_lookup(
+                    (ux + vx) / 2,
+                    (uy + vy) / 2,
+                )
+
+            multiplier = config.RISK_PENALTY_MULTIPLIER.get(
+                risk,
+                config.RISK_PENALTY_MULTIPLIER["LOW"],
+            )
+
+            data["penalised_length"] = (
+                float(data.get("length", 1.0))
+                * multiplier
+            )
 
     return G_penalised
 
+
+# --------------------------------------------------------------------------- #
+# Path risk
+# --------------------------------------------------------------------------- #
 
 def _worst_risk_on_path(
     G: nx.Graph,
@@ -240,13 +334,22 @@ def _worst_risk_on_path(
         if not edge_data:
             continue
 
-        edata = min(
-            edge_data.values(),
-            key=lambda d: d.get("length", 1e9),
-        )
+        if G.is_multigraph():
+            selected_key, edata = min(
+                edge_data.items(),
+                key=lambda item: item[1].get("length", 1e9),
+            )
 
-        edge_id = _edge_id_from_data(edata)
-        risk = street_lookup(edge_id)
+            risk = _edge_risk(
+                street_lookup,
+                u,
+                v,
+                selected_key,
+                edata,
+            )
+        else:
+            edata = edge_data
+            risk = None
 
         if risk is None:
             ux = float(G.nodes[u]["x"])
@@ -265,12 +368,14 @@ def _worst_risk_on_path(
     return worst
 
 
+# --------------------------------------------------------------------------- #
+# Response builder
+# --------------------------------------------------------------------------- #
+
 def _build_route_response(
     G: nx.Graph,
     route_id: str,
     origin_label: str,
-    origin_node,
-    destination_node,
     fastest_path: list,
     safe_path: list,
     zones_geojson: dict,
@@ -341,15 +446,19 @@ def _build_route_response(
     }
 
 
+# --------------------------------------------------------------------------- #
+# Existing fixed demo routes
+# --------------------------------------------------------------------------- #
+
 def compute_route(
     G: nx.Graph,
     route_id: str,
     zones_geojson: dict,
 ) -> dict | None:
     """
-    Existing fixed demo routing.
+    Existing fixed route behavior.
 
-    KEPT INTACT for the existing frontend/API contract.
+    Kept for compatibility with /api/routes/safe.
     """
     od = config.ROUTE_OD_PAIRS.get(route_id)
 
@@ -360,7 +469,10 @@ def compute_route(
 
     G_penalised = G.copy()
 
-    for u, v, data in G_penalised.edges(data=True):
+    for u, v, key, data in G_penalised.edges(
+        keys=True,
+        data=True,
+    ):
         ux = float(G.nodes[u]["x"])
         uy = float(G.nodes[u]["y"])
         vx = float(G.nodes[v]["x"])
@@ -403,66 +515,20 @@ def compute_route(
         weight="penalised_length",
     )
 
-    fastest_len_m, fastest_time_hr = _path_metrics(
-        G,
-        fastest_path,
+    return _build_route_response(
+        G=G,
+        route_id=route_id,
+        origin_label=od["label"],
+        fastest_path=fastest_path,
+        safe_path=safe_path,
+        zones_geojson=zones_geojson,
+        street_risks=None,
     )
 
-    safe_len_m, safe_time_hr = _path_metrics(
-        G,
-        safe_path,
-    )
 
-    def worst_risk_on_path(path_nodes):
-        return _worst_risk_on_path(
-            G,
-            path_nodes,
-            zones_geojson,
-        )
-
-    fastest_risk = worst_risk_on_path(fastest_path)
-    safe_risk = worst_risk_on_path(safe_path)
-
-    return {
-        "id": route_id,
-        "label": od["label"],
-        "scenario_context": "live",
-        "fastest": {
-            "type": "fastest",
-            "duration_min": round(fastest_time_hr * 60),
-            "distance_km": round(fastest_len_m / 1000, 2),
-            "risk": fastest_risk,
-            "geometry": {
-                "type": "LineString",
-                "coordinates": _path_to_coords(
-                    G,
-                    fastest_path,
-                ),
-            },
-        },
-        "safe": {
-            "type": "safe",
-            "duration_min": round(safe_time_hr * 60),
-            "distance_km": round(safe_len_m / 1000, 2),
-            "risk": safe_risk,
-            "geometry": {
-                "type": "LineString",
-                "coordinates": _path_to_coords(
-                    G,
-                    safe_path,
-                ),
-            },
-        },
-        "recommendation": (
-            "safe"
-            if (
-                safe_risk != fastest_risk
-                and fastest_risk in ("MODERATE", "HIGH")
-            )
-            else "fastest"
-        ),
-    }
-
+# --------------------------------------------------------------------------- #
+# Dynamic route
+# --------------------------------------------------------------------------- #
 
 def compute_dynamic_route(
     G: nx.Graph,
@@ -470,12 +536,16 @@ def compute_dynamic_route(
     lat: float,
     zones_geojson: dict,
     street_risks: list[dict],
+    penalised_graph: nx.Graph | None = None,
+    destination_nodes: dict[str, object] | None = None,
 ) -> dict | None:
     """
     Calculate a route starting from the clicked street.
 
     The destination is selected from the existing configured destinations.
-    This keeps the current app behavior intact while making the origin dynamic.
+    The safest candidate is selected by:
+      1. lowest worst-case flood risk
+      2. shortest safe travel time
     """
 
     origin_node = _nearest_node(
@@ -487,19 +557,22 @@ def compute_dynamic_route(
     if origin_node is None:
         return None
 
-    G_penalised = _build_penalised_graph(
-        G,
-        zones_geojson,
-        street_risks,
-    )
+    # Reuse the cached graph from the live refresh when available.
+    if penalised_graph is None:
+        penalised_graph = build_penalised_graph(
+            G,
+            zones_geojson,
+            street_risks,
+        )
+
+    # Reuse precomputed destination nodes when available.
+    if destination_nodes is None:
+        destination_nodes = precompute_destination_nodes(G)
 
     candidates = []
 
     for route_id, od in config.ROUTE_OD_PAIRS.items():
-        destination_node = _nearest_node(
-            G,
-            *od["destination"],
-        )
+        destination_node = destination_nodes.get(route_id)
 
         if destination_node is None:
             continue
@@ -513,7 +586,7 @@ def compute_dynamic_route(
             )
 
             safe_path = nx.shortest_path(
-                G_penalised,
+                penalised_graph,
                 origin_node,
                 destination_node,
                 weight="penalised_length",
@@ -533,7 +606,6 @@ def compute_dynamic_route(
             street_risks,
         )
 
-        # Prefer lower flood risk, then shorter safe travel time.
         candidates.append(
             (
                 _risk_rank(safe_risk),
@@ -542,6 +614,7 @@ def compute_dynamic_route(
                 od,
                 fastest_path,
                 safe_path,
+                safe_len_m,
             )
         )
 
@@ -556,20 +629,19 @@ def compute_dynamic_route(
     )
 
     (
-        _,
-        _,
+        _risk,
+        _time,
         route_id,
         od,
         fastest_path,
         safe_path,
+        _safe_len,
     ) = candidates[0]
 
     return _build_route_response(
         G=G,
         route_id=f"dynamic-{route_id}",
         origin_label=f"Dynamic route → {od['label']}",
-        origin_node=origin_node,
-        destination_node=None,
         fastest_path=fastest_path,
         safe_path=safe_path,
         zones_geojson=zones_geojson,
