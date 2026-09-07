@@ -572,7 +572,7 @@ export function FloodMap({
     const source = mapRef.current.getSource("roads");
     if (!source || !("setData" in source)) return;
 
-    const joined = joinStreetRisksToRoads(roadsGeoJson, streetRisks);
+    const joined = joinStreetRisksToRoads(roadsGeoJson, streetRisks , zones);
     (source as GeoJSONSource).setData(joined);
   }, [isMapReady, roadsGeoJson, streetRisks]);
 
