@@ -10,7 +10,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import type { FloodZone, RouteRecommendation } from "../../types/flood";
+import type { FloodZone, RouteRecommendation, StreetRisk } from "../../types/flood";
 import {
   ANDHERI_BOUNDS,
   ANDHERI_CENTER,
@@ -18,7 +18,6 @@ import {
   joinStreetRisksToRoads,
 } from "../../utils/mapUtils";
 import { RISK_COLORS } from "../../utils/riskUtils";
-import { getStreetRisks } from "../../api/floodApi";
 import { MapLegend } from "./MapLegend";
 
 interface FloodMapProps {
@@ -33,6 +32,13 @@ interface FloodMapProps {
   ) => void;
 
   activeRoute: RouteRecommendation | null;
+
+  /** Whichever street-risk dataset should currently be shown — the parent
+   * (useFloodData) decides whether that's live-polled data or the active
+   * simulation's own per-street risk. FloodMap just renders it; it no longer
+   * fetches street risk itself, which previously meant this layer always
+   * showed live weather risk even while a simulation scenario was active. */
+  streetRisks: StreetRisk[];
 }
 
 const EMPTY_FC: GeoJSON.FeatureCollection = {
@@ -67,6 +73,7 @@ export function FloodMap({
   selectedStreetId,
   onSelectStreet,
   activeRoute,
+  streetRisks,
 }: FloodMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
@@ -533,42 +540,41 @@ export function FloodMap({
   // STREET RISKS
   // -------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!isMapReady || !mapRef.current) return;
+  // Static road-network geometry: fetched once, never changes.
+  const [roadsGeoJson, setRoadsGeoJson] =
+    useState<GeoJSON.FeatureCollection | null>(null);
 
-    const map = mapRef.current;
+  useEffect(() => {
+    if (!isMapReady) return;
     let cancelled = false;
 
-    (async () => {
-      try {
-        const [roadsRes, risksRes] = await Promise.all([
-          fetch(
-            `${import.meta.env.BASE_URL}data/andheri_roads.geojson`
-          ).then((r) => r.json()),
-          getStreetRisks(),
-        ]);
-
-        if (cancelled) return;
-
-        const joined = joinStreetRisksToRoads(
-          roadsRes,
-          risksRes.data
-        );
-
-        const source = map.getSource("roads");
-
-        if (source && "setData" in source) {
-          (source as GeoJSONSource).setData(joined);
-        }
-      } catch {
-        // Keep the road network visible if street-risk loading fails.
-      }
-    })();
+    fetch(`${import.meta.env.BASE_URL}data/andheri_roads.geojson`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setRoadsGeoJson(data);
+      })
+      .catch(() => {
+        // Keep the road network hidden rather than crashing the map if this
+        // static asset fails to load.
+      });
 
     return () => {
       cancelled = true;
     };
   }, [isMapReady]);
+
+  // Per-street risk: driven entirely by the streetRisks prop, so this reruns
+  // whenever the parent's active dataset changes — including switching into
+  // or between simulation scenarios, not just once on map load.
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current || !roadsGeoJson) return;
+
+    const source = mapRef.current.getSource("roads");
+    if (!source || !("setData" in source)) return;
+
+    const joined = joinStreetRisksToRoads(roadsGeoJson, streetRisks);
+    (source as GeoJSONSource).setData(joined);
+  }, [isMapReady, roadsGeoJson, streetRisks]);
 
   // -------------------------------------------------------------------------
   // SELECTED ZONE
