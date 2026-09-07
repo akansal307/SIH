@@ -55,12 +55,24 @@ async def _refresh_live_state(app: FastAPI) -> None:
           max_tide_height_m=live.max_tide_height_m,
           num_high_tides=live.num_high_tides,
         )
-          
+
+        # Rebuild the penalised routing graph HERE — once per poll cycle —
+        # instead of on every /api/routes/dynamic request. This is the
+        # expensive full-graph pass (per-edge flood-zone lookup), and it only
+        # needs to reflect state as fresh as the rain poll interval anyway.
+        penalised_graph = await asyncio.to_thread(
+            routing_service.build_penalised_graph,
+            st.graph,
+            current["zones"],
+            streets,
+        )
+
         async with st.lock:
             st.latest_current = current
             st.latest_forecast = forecast
             st.latest_streets = streets
             st.latest_live_conditions = live
+            st.latest_penalised_graph = penalised_graph
             st.last_updated = base_time
         logger.info(
             "Live state refreshed: overall_risk=%s affected_zones=%d rain_source=%s tide_source=%s",
@@ -109,6 +121,11 @@ async def lifespan(app: FastAPI):
         "Loaded model (%d zones, spatial cache source=%s) and road graph (%d nodes / %d edges).",
         len(artifacts.zones), artifacts.zones_source, graph.number_of_nodes(), graph.number_of_edges(),
     )
+
+    # Destinations in config.ROUTE_OD_PAIRS are static — resolve their nearest
+    # road nodes once, here, instead of re-scanning the graph for them on
+    # every single /api/routes/dynamic request.
+    app.state.flood.destination_nodes = routing_service.precompute_destination_nodes(graph)
 
     # One synchronous tide fetch, then one synchronous rain+state refresh, before
     # accepting traffic, so the very first request doesn't race either poller.
@@ -200,6 +217,26 @@ async def post_simulate(body: SimulateRequest):
         max_tide_height_m=max_tide_height_m, num_high_tides=num_high_tides, base_time=base_time,
     )
 
+    # Street-level risk for this scenario, using the SAME rain features as the
+    # "current" (offset 0) zone snapshot above — previously this endpoint only
+    # ever computed zone-level risk, so the map's street layer (fed separately
+    # by /api/flood/streets, which always reflects LIVE weather) never
+    # reflected the simulated scenario at all. That's why streets stayed green
+    # during e.g. an Extreme Cloudburst run even though the zones correctly
+    # turned red.
+    rain_total, rain_hourly, rain_peak3 = model_service.rain_features_at(
+        elapsed_at_now_min, rainfall_mm_hr, duration_min,
+    )
+    streets = model_service.build_street_risks(
+        st.artifacts,
+        rain_total_mm=rain_total,
+        rain_hourly_mm=rain_hourly,
+        rain_peak_3hr_mm=rain_peak3,
+        max_tide_height_m=max_tide_height_m,
+        num_high_tides=num_high_tides,
+        blockage_percent=blockage_percent,
+    )
+
     return {
         "id": body.scenario or "custom",
         "label": preset["label"] if preset else "Custom scenario",
@@ -213,6 +250,7 @@ async def post_simulate(body: SimulateRequest):
         "num_high_tides": num_high_tides,
         "current": current,
         "forecast": forecast,
+        "streets": streets,
         "model_notes": [],
     }
 
@@ -268,6 +306,7 @@ async def get_dynamic_route(
     async with st.lock:
         zones_geojson = st.latest_current["zones"]
         street_risks = st.latest_streets or []
+        penalised_graph = st.latest_penalised_graph
 
     route = await asyncio.to_thread(
         routing_service.compute_dynamic_route,
@@ -276,6 +315,8 @@ async def get_dynamic_route(
         lat,
         zones_geojson,
         street_risks,
+        penalised_graph,
+        st.destination_nodes,
     )
 
     if route is None:
