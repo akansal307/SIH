@@ -102,6 +102,7 @@ export function adaptSimulationPreset(p: SimulationPresetWire): SimulationResult
     },
     current: adaptFloodState(p.current),
     forecast: p.forecast.map(adaptFloodState),
+    streets: (p.streets ?? []).map(adaptStreetRisk),
   };
 }
 
