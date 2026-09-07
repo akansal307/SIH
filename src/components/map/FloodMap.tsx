@@ -342,38 +342,44 @@ export function FloodMap({
       // layer-specific click handler doesn't fire.
       // ---------------------------------------------------------------------
 
+      
       const handleMapClick = (e: MapLayerMouseEvent) => {
-        const zoneHits = map.queryRenderedFeatures(e.point, {
-          layers: ["zones-fill"],
-        });
+  const zoneHits = map.queryRenderedFeatures(e.point, {
+    layers: ["zones-fill"],
+  });
 
-        const streetHits = map.queryRenderedFeatures(e.point, {
-          layers: ["roads-hit"],
-        });
+  const streetHits = map.queryRenderedFeatures(e.point, {
+    layers: ["roads-hit"],
+  });
 
-        // If a street was clicked, select it directly.
-        if (streetHits.length > 0) {
-          const feature = streetHits[0] as MapGeoJSONFeature;
+  // Keep the selected zone synchronized with the location clicked.
+  if (zoneHits.length > 0) {
+    const zoneFeature = zoneHits[0] as MapGeoJSONFeature;
 
-          if (feature.properties) {
-            const edgeId = feature.properties.edge_id;
+    if (zoneFeature.properties?.zoneId) {
+      onSelectZone(
+        String(zoneFeature.properties.zoneId)
+      );
+    }
+  } else {
+    onSelectZone(null);
+  }
 
-            if (edgeId) {
-              onSelectStreet(
-                String(edgeId),
-                [e.lngLat.lng, e.lngLat.lat]
-              );
-            }
-          }
-        } else {
-          onSelectStreet(null, null);
-        }
+  // Select the clicked street and preserve the exact click location.
+  if (streetHits.length > 0) {
+    const streetFeature =
+      streetHits[0] as MapGeoJSONFeature;
 
-        // Keep original zone-selection behavior.
-        if (zoneHits.length === 0) {
-          onSelectZone(null);
-        }
-      };
+    if (streetFeature.properties?.edge_id) {
+      onSelectStreet(
+        String(streetFeature.properties.edge_id),
+        [e.lngLat.lng, e.lngLat.lat]
+      );
+    }
+  } else {
+    onSelectStreet(null, null);
+  }
+};
 
       // ---------------------------------------------------------------------
       // ZONE HOVER
