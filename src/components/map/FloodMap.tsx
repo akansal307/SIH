@@ -574,7 +574,7 @@ export function FloodMap({
 
     const joined = joinStreetRisksToRoads(roadsGeoJson, streetRisks , zones);
     (source as GeoJSONSource).setData(joined);
-  }, [isMapReady, roadsGeoJson, streetRisks]);
+  }, [isMapReady, roadsGeoJson, streetRisks, zones]);
 
   // -------------------------------------------------------------------------
   // SELECTED ZONE
