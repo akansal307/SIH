@@ -237,17 +237,29 @@ export function useFloodData(): UseFloodDataResult {
     );
   }, [currentState, selectedZoneId]);
 
+  // Which street-risk dataset is "active": the simulated scenario's own
+  // per-street risk while in SIMULATION mode, otherwise the live-polled one.
+  // Previously the map always used the live-polled streetRisks state, even
+  // during a simulation run, which is why e.g. an Extreme Cloudburst run
+  // showed correctly red zones but streets that stayed live-weather green.
+  const effectiveStreetRisks = useMemo(() => {
+    if (mode === "SIMULATION" && simulation) {
+      return simulation.streets ?? [];
+    }
+    return streetRisks;
+  }, [mode, simulation, streetRisks]);
+
   const selectedStreet = useMemo(() => {
     if (!selectedStreetId) {
       return null;
     }
 
     return (
-      streetRisks.find(
+      effectiveStreetRisks.find(
         (s) => s.edgeId === selectedStreetId
       ) ?? null
     );
-  }, [streetRisks, selectedStreetId]);
+  }, [effectiveStreetRisks, selectedStreetId]);
 
   return {
     mode,
@@ -266,7 +278,7 @@ export function useFloodData(): UseFloodDataResult {
     selectZone: setSelectedZoneId,
     selectedZone,
 
-    streetRisks,
+    streetRisks: effectiveStreetRisks,
     selectedStreetId,
     selectedStreetPoint,
     selectStreet,
