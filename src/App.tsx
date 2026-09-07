@@ -51,6 +51,7 @@ export default function App() {
             selectedStreetId={floodData.selectedStreetId}
             onSelectStreet={floodData.selectStreet}
             activeRoute={activeRoute}
+            streetRisks={floodData.streetRisks}
           />
         </main>
 
