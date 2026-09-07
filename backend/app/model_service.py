@@ -384,30 +384,41 @@ def evaluate_snapshot(
 def build_street_risks(
     artifacts: ModelArtifacts, *, rain_total_mm: float, rain_hourly_mm: float,
     rain_peak_3hr_mm: float, max_tide_height_m: float, num_high_tides: int,
+    blockage_percent: float = 0.0,
 ) -> list[dict]:
     """Runs the exact same real model as build_state_snapshot(), but against every
-    individual street (edge) instead of the 33 aggregated zones."""
+    individual street (edge) instead of the 33 aggregated zones.
+
+    `blockage_percent` mirrors the zone path's apply_blockage() call, so scenario
+    runs (e.g. 'cloudburst_drain_blockage') affect per-street risk the same way
+    they already affect per-zone risk. Defaults to 0 (no-op) so the existing live
+    call site (main.py's poll loop, which never has a blockage concept) is
+    unaffected."""
     if not artifacts.streets:
         return []
 
+    streets_static_eff = [
+        apply_blockage(s["static_factors"], blockage_percent) for s in artifacts.streets
+    ]
+
     rows = [{
-        "slope": s["static_factors"]["slope"],
-        "distance_to_waterway_m": s["static_factors"]["distance_to_waterway_m"],
-        "drain_density": s["static_factors"]["drain_density"],
-        "distance_to_drain_m": s["static_factors"]["distance_to_drain_m"],
+        "slope": eff["slope"],
+        "distance_to_waterway_m": eff["distance_to_waterway_m"],
+        "drain_density": eff["drain_density"],
+        "distance_to_drain_m": eff["distance_to_drain_m"],
         "rain_total_mm": rain_total_mm,
         "rain_max_hourly_mm": rain_hourly_mm,
         "rain_peak_3hr_mm": rain_peak_3hr_mm,
         "max_tide_height_m": max_tide_height_m,
         "num_high_tides": num_high_tides,
-    } for s in artifacts.streets]
+    } for eff in streets_static_eff]
 
     X = pd.DataFrame(rows, columns=artifacts.feature_cols)
     proba = artifacts.model.predict_proba(X)
     pred_class = proba.argmax(axis=1)
 
     results = []
-    for s, static_eff, p, c in zip(artifacts.streets, (s["static_factors"] for s in artifacts.streets), proba, pred_class):
+    for s, static_eff, p, c in zip(artifacts.streets, streets_static_eff, proba, pred_class):
         risk = config.CLASS_TO_RISK[int(c)]
         depth_cm, onset_minutes = depth_and_onset(int(c), p, artifacts.thresholds, static_eff)
         probability = round(float(p[1] + p[2]), 4)
