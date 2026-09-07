@@ -110,6 +110,10 @@ export interface SimulationPresetWire {
   num_high_tides: number;
   current: FloodStateWire;
   forecast: FloodStateWire[];
+  /** Per-street risk for this scenario (same shape as GET /api/flood/streets).
+   * Optional so older backends / bundled mock JSON without this field still
+   * decode fine — adaptSimulationPreset() defaults to []. */
+  streets?: StreetRiskWire[];
   model_notes: string[];
 }
 
@@ -251,6 +255,11 @@ export interface SimulationResult {
   scenario: SimulationScenario;
   current: FloodState;
   forecast: ForecastSnapshot[];
+  /** Per-street risk for this scenario. Optional/possibly-undefined at
+   * runtime for mock/demo presets loaded from scenarios.json, which predates
+   * this field (that bundle is loaded via an unchecked type cast — see
+   * mockFloodData.ts). Consumers should default to [] (see useFloodData.ts). */
+  streets?: StreetRisk[];
 }
 
 export interface RouteOption {
