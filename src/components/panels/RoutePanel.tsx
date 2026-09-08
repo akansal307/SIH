@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigation, ShieldCheck, Zap, X } from "lucide-react";
 
 import type {
+  FloodZone,
   RouteOption,
   RouteRecommendation,
   StreetRisk,
@@ -51,12 +52,16 @@ function RouteCard({
 
 interface RoutePanelProps {
   streetRisk: StreetRisk | null;
+  streetRisks: StreetRisk[];
+  zones: FloodZone[];
   point: [number, number] | null;
   onRouteChange?: (route: RouteRecommendation | null) => void;
 }
 
 export function RoutePanel({
   streetRisk,
+  streetRisks,
+  zones,
   point,
   onRouteChange,
 }: RoutePanelProps) {
@@ -105,7 +110,7 @@ export function RoutePanel({
 
     setIsLoading(true);
 
-    getDynamicRoute(point[0], point[1])
+    getDynamicRoute(point[0], point[1], zones, streetRisks)
       .then((res) => {
         if (cancelled) return;
 
@@ -132,7 +137,7 @@ export function RoutePanel({
     return () => {
       cancelled = true;
     };
-  }, [point, needsRerouting, onRouteChange]);
+  }, [point, needsRerouting, onRouteChange, streetRisks, zones]);
 
   const activeRoute =
     dismissed ? null : route;

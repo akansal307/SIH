@@ -202,6 +202,25 @@ def _edge_risk(
     return None
 
 
+def _low_risk_destination_nodes(
+    G: nx.Graph,
+    street_risks: list[dict],
+) -> set:
+    """Return graph nodes that border at least one currently low-risk street."""
+    street_lookup = _street_risk_lookup(street_risks)
+    destinations = set()
+
+    if not street_risks:
+        return destinations
+
+    for u, v, key, data in G.edges(keys=True, data=True):
+        if _edge_risk(street_lookup, u, v, key, data) == "LOW":
+            destinations.add(u)
+            destinations.add(v)
+
+    return destinations
+
+
 # --------------------------------------------------------------------------- #
 # Destination preparation
 # --------------------------------------------------------------------------- #
@@ -564,6 +583,65 @@ def compute_dynamic_route(
             zones_geojson,
             street_risks,
         )
+
+    # Prefer the nearest reachable low-risk road area from the active street
+    # dataset. Configured destinations remain the fallback for older/partial
+    # responses that do not contain per-street predictions.
+    low_risk_nodes = _low_risk_destination_nodes(G, street_risks)
+    if low_risk_nodes:
+        try:
+            safe_distances, safe_paths = nx.single_source_dijkstra(
+                penalised_graph,
+                origin_node,
+                weight="penalised_length",
+            )
+        except nx.NetworkXNoPath:
+            safe_distances, safe_paths = {}, {}
+
+        low_risk_candidates = []
+        for destination_node in low_risk_nodes:
+            if destination_node == origin_node:
+                continue
+
+            safe_path = safe_paths.get(destination_node)
+            if not safe_path:
+                continue
+
+            safe_risk = _worst_risk_on_path(
+                G,
+                safe_path,
+                zones_geojson,
+                street_risks,
+            )
+            safe_len_m, safe_time_hr = _path_metrics(G, safe_path)
+            low_risk_candidates.append(
+                (
+                    _risk_rank(safe_risk),
+                    safe_time_hr,
+                    destination_node,
+                    safe_path,
+                    safe_len_m,
+                )
+            )
+
+        if low_risk_candidates:
+            low_risk_candidates.sort(key=lambda item: (item[0], item[1]))
+            _, _, destination_node, safe_path, _ = low_risk_candidates[0]
+            fastest_path = nx.shortest_path(
+                G,
+                origin_node,
+                destination_node,
+                weight="length",
+            )
+            return _build_route_response(
+                G=G,
+                route_id="dynamic-low-risk-area",
+                origin_label="Nearest low-risk area",
+                fastest_path=fastest_path,
+                safe_path=safe_path,
+                zones_geojson=zones_geojson,
+                street_risks=street_risks,
+            )
 
     # Reuse precomputed destination nodes when available.
     if destination_nodes is None:

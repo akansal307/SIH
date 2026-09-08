@@ -8,9 +8,11 @@
  */
 
 import type {
+  FloodZone,
   ApiResult,
   RouteExampleWire,
   RouteRecommendation,
+  StreetRisk,
 } from "../types/flood";
 
 import { adaptRoute } from "./adapters";
@@ -140,6 +142,8 @@ export async function getSafeRoute(
 export async function getDynamicRoute(
   lon: number,
   lat: number,
+  zones: FloodZone[],
+  streetRisks: StreetRisk[],
 ): Promise<ApiResult<RouteRecommendation | null>> {
   if (!IS_BACKEND_CONFIGURED) {
     return {
@@ -151,10 +155,26 @@ export async function getDynamicRoute(
 
   try {
     const wire = await fetchJson<RouteExampleWire>(
-      `${API_BASE_URL}/api/routes/dynamic?lon=${encodeURIComponent(
-        lon,
-      )}&lat=${encodeURIComponent(lat)}`,
+      `${API_BASE_URL}/api/routes/dynamic`,
       {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lon,
+          lat,
+          zones: {
+            type: "FeatureCollection",
+            features: zones.map((zone) => ({
+              type: "Feature",
+              properties: { zone_id: zone.id, risk: zone.risk },
+              geometry: zone.geometry,
+            })),
+          },
+          street_risks: streetRisks.map((street) => ({
+            edge_id: street.edgeId,
+            risk: street.risk,
+          })),
+        }),
         timeoutMs: 15000,
       },
     );

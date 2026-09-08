@@ -249,41 +249,10 @@ export function useFloodData(): UseFloodDataResult {
     return streetRisks;
   }, [mode, simulation, streetRisks]);
 
- const selectedStreet = useMemo(() => {
-  if (!selectedStreetId) {
-    return null;
-  }
-
-  const street = effectiveStreetRisks.find(
-    (s) => s.edgeId === selectedStreetId
-  );
-
-  if (!street) {
-    return null;
-  }
-
-  /*
-   * The map displays street color according to the containing zone.
-   * Use the same zone risk for the selected street so Street Details
-   * and RoutePanel never contradict what the user sees on the map.
-   */
-  const zone = selectedZone;
-
-  if (!zone) {
-    return street;
-  }
-
-  return {
-    ...street,
-    risk: zone.risk,
-    probability: zone.probability,
-    onsetMinutes: zone.onsetMinutes,
-  };
-}, [
-  effectiveStreetRisks,
-  selectedStreetId,
-  selectedZone,
-]);
+  const selectedStreet = useMemo(() => {
+    if (!selectedStreetId) return null;
+    return effectiveStreetRisks.find((s) => s.edgeId === selectedStreetId) ?? null;
+  }, [effectiveStreetRisks, selectedStreetId]);
   return {
     mode,
     setMode,

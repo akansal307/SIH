@@ -47,6 +47,11 @@ export async function fetchJson<T>(url: string, opts: RequestInit & { timeoutMs?
 /** Base URL for the real backend, from VITE_API_BASE_URL (see .env.example). Empty
  * string means "no backend configured" — callers should fall back to mock mode
  * rather than hard-coding localhost, per the brief's environment-config rule. */
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
 
-export const IS_BACKEND_CONFIGURED = API_BASE_URL.trim().length > 0;
+// In Vite development, an empty base uses the same-origin proxy configured in
+// vite.config.ts. Keep requests rooted at "/api", never "//api".
+export const API_BASE_URL: string = configuredApiBaseUrl;
+
+export const IS_BACKEND_CONFIGURED =
+  configuredApiBaseUrl.trim().length > 0 || import.meta.env.DEV;

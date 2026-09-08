@@ -4,4 +4,12 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   base: '/',
+  server: {
+    host: true,
+    allowedHosts: ['.app.github.dev', '.devtunnels.ms'],
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      '/health': 'http://127.0.0.1:8000',
+    },
+  },
 })

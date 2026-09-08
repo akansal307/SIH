@@ -250,6 +250,11 @@ def depth_and_onset(risk_class: int, prob_by_class: np.ndarray, thresholds: dict
     return round(float(depth), 1), max(3, round(float(onset)))
 
 
+def street_onset_minutes(probability: float) -> int:
+    """Convert the model's flood probability into a bounded alert horizon."""
+    return max(1, round((1.0 - probability) * 180.0))
+
+
 def build_alert_message(zone_name: str, risk: str, depth_cm: float, onset_minutes):
     if risk == "HIGH":
         onset_txt = f"Onset in ~{onset_minutes} min" if onset_minutes is not None else "Onset imminent"
@@ -420,14 +425,13 @@ def build_street_risks(
     results = []
     for s, static_eff, p, c in zip(artifacts.streets, streets_static_eff, proba, pred_class):
         risk = config.CLASS_TO_RISK[int(c)]
-        depth_cm, onset_minutes = depth_and_onset(int(c), p, artifacts.thresholds, static_eff)
         probability = round(float(p[1] + p[2]), 4)
         results.append({
-            "edge_id": s["edge_id"],
+            "edge_id": str(s["edge_id"]),
             "risk": risk,
             "probability": probability,
-            "depth_cm": depth_cm,
-            "onset_minutes": onset_minutes,
+            "depth_cm": None,
+            "onset_minutes": street_onset_minutes(probability),
         })
     return results
 

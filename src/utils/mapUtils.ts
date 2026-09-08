@@ -37,7 +37,6 @@ export function routeToFeature(geometry: GeoJSON.Geometry, properties: Record<st
 export function joinStreetRisksToRoads(
   roadsGeoJson: GeoJSON.FeatureCollection,
   streetRisks: StreetRisk[],
-  zones: FloodZone[],
 ): GeoJSON.FeatureCollection {
   const riskById = new Map(
     streetRisks.map((s) => [s.edgeId, s]),
@@ -48,153 +47,30 @@ export function joinStreetRisksToRoads(
     features: roadsGeoJson.features.map((f) => {
       const edgeId =
         (f.properties as Record<string, unknown> | null)?.edge_id;
+      const edgeIdString =
+        edgeId === undefined || edgeId === null
+          ? undefined
+          : String(edgeId);
 
-      const streetRisk = edgeId
-        ? riskById.get(String(edgeId))
+      const streetRisk = edgeIdString
+        ? riskById.get(edgeIdString)
         : undefined;
-
-      const zoneRisk = findZoneRiskForRoad(f, zones);
 
       return {
         ...f,
-        id: edgeId,
+        id: edgeIdString,
 
         properties: {
           ...f.properties,
 
-          // Keep the actual street model prediction.
+          // The matched street prediction is the sole source for road styling.
           streetRisk: streetRisk?.risk ?? "LOW",
           streetProbability: streetRisk?.probability ?? 0,
+          probability: streetRisk?.probability ?? 0,
           onsetMinutes: streetRisk?.onsetMinutes ?? null,
-
-          // This is now the risk used for the visible road color.
-          risk: zoneRisk,
+          risk: streetRisk?.risk ?? "LOW",
         },
       };
     }),
   };
-}
-
-function findZoneRiskForRoad(
-  feature: GeoJSON.Feature,
-  zones: FloodZone[],
-): "LOW" | "MODERATE" | "HIGH" {
-  const midpoint = getRoadMidpoint(feature.geometry);
-
-  if (!midpoint) return "LOW";
-
-  for (const zone of zones) {
-    if (
-      pointInGeometry(
-        midpoint[0],
-        midpoint[1],
-        zone.geometry,
-      )
-    ) {
-      return zone.risk;
-    }
-  }
-
-  return "LOW";
-}
-
-function getRoadMidpoint(
-  geometry: GeoJSON.Geometry,
-): [number, number] | null {
-  if (geometry.type === "LineString") {
-    const coords = geometry.coordinates;
-
-    if (coords.length === 0) return null;
-
-    return coords[
-      Math.floor(coords.length / 2)
-    ] as [number, number];
-  }
-
-  if (geometry.type === "MultiLineString") {
-    const lines = geometry.coordinates;
-
-    if (lines.length === 0) return null;
-
-    const longest = lines.reduce(
-      (best, line) =>
-        line.length > best.length ? line : best,
-      lines[0],
-    );
-
-    if (!longest || longest.length === 0) {
-      return null;
-    }
-
-    return longest[
-      Math.floor(longest.length / 2)
-    ] as [number, number];
-  }
-
-  return null;
-}
-
-function pointInGeometry(
-  lon: number,
-  lat: number,
-  geometry: GeoJSON.Geometry,
-): boolean {
-  if (geometry.type === "Polygon") {
-    return polygonContainsPoint(
-      lon,
-      lat,
-      geometry.coordinates,
-    );
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    return geometry.coordinates.some(
-      (polygon) =>
-        polygonContainsPoint(
-          lon,
-          lat,
-          polygon,
-        ),
-    );
-  }
-
-  return false;
-}
-
-function polygonContainsPoint(
-  lon: number,
-  lat: number,
-  polygon: number[][][],
-): boolean {
-  const outerRing = polygon[0];
-
-  if (!outerRing || outerRing.length < 3) {
-    return false;
-  }
-
-  let inside = false;
-
-  for (
-    let i = 0, j = outerRing.length - 1;
-    i < outerRing.length;
-    j = i++
-  ) {
-    const xi = outerRing[i][0];
-    const yi = outerRing[i][1];
-    const xj = outerRing[j][0];
-    const yj = outerRing[j][1];
-
-    const intersects =
-      yi > lat !== yj > lat &&
-      lon <
-        ((xj - xi) * (lat - yi)) /
-          (yj - yi) +
-          xi;
-
-    if (intersects) {
-      inside = !inside;
-    }
-  }
-
-  return inside;
 }

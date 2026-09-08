@@ -99,6 +99,8 @@ export default function App() {
 
             <RoutePanel
               streetRisk={floodData.selectedStreet}
+              streetRisks={floodData.streetRisks}
+              zones={floodData.currentState?.zones ?? []}
               point={floodData.selectedStreetPoint}
               onRouteChange={setActiveRoute}
             />

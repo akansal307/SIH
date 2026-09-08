@@ -21,3 +21,10 @@ class SimulateRequest(BaseModel):
     blockage_percent: float | None = Field(default=None, ge=0, le=100)
     max_tide_height_m: float | None = Field(default=None, ge=0)
     num_high_tides: int | None = Field(default=None, ge=0)
+
+
+class DynamicRouteRequest(BaseModel):
+    lon: float
+    lat: float
+    zones: dict
+    street_risks: list[dict]

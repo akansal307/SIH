@@ -24,7 +24,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, model_service, routing_service, weather_service
-from .schemas import SimulateRequest
+from .schemas import DynamicRouteRequest, SimulateRequest
 from .state import AppState
 
 logging.basicConfig(
@@ -553,4 +553,32 @@ async def get_dynamic_route(
             detail="No dynamic safe route available from this location.",
         )
 
+    return route
+
+
+@app.post("/api/routes/dynamic")
+async def post_dynamic_route(body: DynamicRouteRequest):
+    """Route against the exact zone/street snapshot currently shown by the UI."""
+    st = _get_state()
+    if not st.is_ready():
+        raise HTTPException(status_code=503, detail="Live flood state not ready yet — try again shortly.")
+
+    penalised_graph = await asyncio.to_thread(
+        routing_service.build_penalised_graph,
+        st.graph,
+        body.zones,
+        body.street_risks,
+    )
+    route = await asyncio.to_thread(
+        routing_service.compute_dynamic_route,
+        st.graph,
+        body.lon,
+        body.lat,
+        body.zones,
+        body.street_risks,
+        penalised_graph,
+        dict(st.destination_nodes),
+    )
+    if route is None:
+        raise HTTPException(status_code=404, detail="No dynamic safe route available from this location.")
     return route
