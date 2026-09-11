@@ -2,5 +2,14 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": "vite"
+  "framework": "vite",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{backend/**,data/source/**,data/derived/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/health", "destination": "/api/index" }
+    ]
 }

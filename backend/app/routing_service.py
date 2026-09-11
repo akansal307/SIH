@@ -598,35 +598,22 @@ def compute_dynamic_route(
         except nx.NetworkXNoPath:
             safe_distances, safe_paths = {}, {}
 
-        low_risk_candidates = []
-        for destination_node in low_risk_nodes:
-            if destination_node == origin_node:
-                continue
-
-            safe_path = safe_paths.get(destination_node)
-            if not safe_path:
-                continue
-
-            safe_risk = _worst_risk_on_path(
-                G,
-                safe_path,
-                zones_geojson,
-                street_risks,
-            )
-            safe_len_m, safe_time_hr = _path_metrics(G, safe_path)
-            low_risk_candidates.append(
-                (
-                    _risk_rank(safe_risk),
-                    safe_time_hr,
-                    destination_node,
-                    safe_path,
-                    safe_len_m,
-                )
-            )
+        # Penalised Dijkstra already encodes street risk. Selecting the
+        # nearest low-risk endpoint avoids re-scanning every candidate path
+        # with Shapely for the full street prediction payload.
+        low_risk_candidates = [
+            destination_node
+            for destination_node in low_risk_nodes
+            if destination_node != origin_node
+            and destination_node in safe_paths
+        ]
 
         if low_risk_candidates:
-            low_risk_candidates.sort(key=lambda item: (item[0], item[1]))
-            _, _, destination_node, safe_path, _ = low_risk_candidates[0]
+            destination_node = min(
+                low_risk_candidates,
+                key=lambda node: safe_distances[node],
+            )
+            safe_path = safe_paths[destination_node]
             fastest_path = nx.shortest_path(
                 G,
                 origin_node,
